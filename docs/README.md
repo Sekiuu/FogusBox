@@ -1,5 +1,7 @@
-ระบบ **Dynamic Pairing Code** 
+Physical Computing Project 2026 - IT KMITL
 
+---
+ระบบ **Dynamic Pairing Code** 
 ---
 
 ### 1. โครงสร้าง Topic ทั้งหมด
