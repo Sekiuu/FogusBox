@@ -4,7 +4,6 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 /**
  * Props
- *
  * @property mqttMassage - Latest raw MQTT payload from the pairing topic.
  * @property onPair - Callback invoked with the submitted code; returns whether pairing succeeded.
  */

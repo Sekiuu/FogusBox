@@ -18,5 +18,9 @@ export const useMQTT = () => {
     }
   }
 
-  return { subscribe }
+  const publish = (topic: string, message: string) => {
+    client.publish(topic, message)
+  }
+
+  return { subscribe, publish }
 }

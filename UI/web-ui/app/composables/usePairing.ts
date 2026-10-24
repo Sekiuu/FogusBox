@@ -72,7 +72,7 @@ export const usePairing = () => {
         toast.add({
           title: 'Success',
           color: 'primary',
-          description: `connected id is ${code}`,
+          description: `connected id is ${deviceId.value}`,
         })
         return true
       }
