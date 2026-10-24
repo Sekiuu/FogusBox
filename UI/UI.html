@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Timer</title>
+    <!-- โหลด Tailwind CSS สำหรับจัดการความสวยงามและ Layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- โหลดฟอนต์ Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<!-- ใช้ Flexbox จัดให้อยู่ตรงกลางจอ (min-h-screen = สูงเต็มจอ, items-center = กลางแนวตั้ง, justify-center = กลางแนวนอน) -->
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- กล่องหลักของ Timer -->
+    <div class="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center gap-6 w-full max-w-sm">
+        
+        <!-- ส่วนแสดงเวลาตัวใหญ่ -->
+        <div id="display" class="text-7xl font-bold text-gray-800 tracking-widest font-mono">
+            05:00
+        </div>
+
+        <!-- ส่วนตั้งค่าเวลา (นาที / วินาที) -->
+        <div class="flex gap-4 w-full justify-center">
+            <div class="flex flex-col items-center">
+                <label class="text-sm text-gray-500 mb-1">นาที (Min)</label>
+                <input type="number" id="inputMin" value="5" min="0" class="w-20 p-2 text-center text-xl border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+            <div class="flex flex-col items-center">
+                <label class="text-sm text-gray-500 mb-1">วินาที (Sec)</label>
+                <input type="number" id="inputSec" value="0" min="0" max="59" class="w-20 p-2 text-center text-xl border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+        </div>
+
+        <!-- ปุ่มควบคุม -->
+        <div class="flex gap-3 w-full">
+            <button id="btnStart" class="flex-1 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors shadow-md shadow-blue-500/30">เริ่ม</button>
+            <button id="btnPause" class="flex-1 py-3 bg-yellow-500 text-white rounded-xl font-semibold hover:bg-yellow-600 transition-colors shadow-md shadow-yellow-500/30 hidden">พัก</button>
+            <button id="btnReset" class="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors">รีเซ็ต</button>
+        </div>
+
+        <!-- ข้อความแจ้งเตือนเมื่อหมดเวลา (ซ่อนไว้ก่อน) -->
+        <div id="messageBox" class="w-full p-3 bg-green-100 text-green-700 rounded-xl text-center font-semibold hidden">
+            ⏰ หมดเวลาแล้ว!
+        </div>
+
+    </div>
+
+    <!-- ส่วนของ JavaScript -->
+    <script>
+        // ดึง Element ต่างๆ มาเก็บไว้ในตัวแปร
+        const display = document.getElementById('display');
+        const inputMin = document.getElementById('inputMin');
+        const inputSec = document.getElementById('inputSec');
+        const btnStart = document.getElementById('btnStart');
+        const btnPause = document.getElementById('btnPause');
+        const btnReset = document.getElementById('btnReset');
+        const messageBox = document.getElementById('messageBox');
+
+        let timerInterval;     // เก็บตัว interval
+        let totalSeconds = 0;  // เก็บเวลาที่เหลือ (หน่วยเป็นวินาที)
+        let isRunning = false; // เช็คสถานะว่ากำลังจับเวลาอยู่ไหม
+
+        // ฟังก์ชันสำหรับแปลงวินาทีเป็นรูปแบบ MM:SS แล้วแสดงบนจอ
+        function updateDisplay() {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            
+            // เติมเลข 0 ด้านหน้าถ้าเลขตัวเดียว (เช่น 5 -> 05)
+            const formattedMin = String(minutes).padStart(2, '0');
+            const formattedSec = String(seconds).padStart(2, '0');
+            
+            display.textContent = `${formattedMin}:${formattedSec}`;
+        }
+
+        // ฟังก์ชันอ่านค่าจากช่อง Input มาคำนวณเป็นวินาทีรวม
+        function readInputs() {
+            const min = parseInt(inputMin.value) || 0;
+            const sec = parseInt(inputSec.value) || 0;
+            totalSeconds = (min * 60) + sec;
+        }
+
+        // เมื่อกดปุ่ม เริ่ม (Start)
+        btnStart.addEventListener('click', () => {
+            if (isRunning) return;
+
+            // ถ้าเวลายังเป็น 0 ให้ดึงค่าจากช่อง input ใหม่
+            if (totalSeconds <= 0) {
+                readInputs();
+            }
+
+            if (totalSeconds > 0) {
+                isRunning = true;
+                messageBox.classList.add('hidden'); // ซ่อนข้อความแจ้งเตือน
+                btnStart.classList.add('hidden');   // ซ่อนปุ่มเริ่ม
+                btnPause.classList.remove('hidden');// แสดงปุ่มพัก
+
+                // เริ่มนับถอยหลังทุกๆ 1 วินาที (1000 มิลลิวินาที)
+                timerInterval = setInterval(() => {
+                    totalSeconds--;
+                    updateDisplay();
+
+                    // ถ้าหมดเวลา
+                    if (totalSeconds <= 0) {
+                        clearInterval(timerInterval);
+                        isRunning = false;
+                        btnStart.classList.remove('hidden');
+                        btnPause.classList.add('hidden');
+                        messageBox.classList.remove('hidden'); // แสดงข้อความหมดเวลา
+                    }
+                }, 1000);
+            }
+        });
+
+        // เมื่อกดปุ่ม พัก (Pause)
+        btnPause.addEventListener('click', () => {
+            clearInterval(timerInterval);
+            isRunning = false;
+            btnPause.classList.add('hidden');
+            btnStart.classList.remove('hidden');
+        });
+
+        // เมื่อกดปุ่ม รีเซ็ต (Reset)
+        btnReset.addEventListener('click', () => {
+            clearInterval(timerInterval);
+            isRunning = false;
+            btnPause.classList.add('hidden');
+            btnStart.classList.remove('hidden');
+            messageBox.classList.add('hidden');
+            
+            // ดึงค่าใหม่จากช่อง Input แล้วอัปเดตหน้าจอทันที
+            readInputs();
+            updateDisplay();
+        });
+
+        // เมื่อมีการเปลี่ยนตัวเลขในช่อง input ตอนที่ไม่ได้รันอยู่ ให้อัปเดตจอล่วงหน้า
+        inputMin.addEventListener('input', () => { if(!isRunning) { readInputs(); updateDisplay(); } });
+        inputSec.addEventListener('input', () => { if(!isRunning) { readInputs(); updateDisplay(); } });
+
+        // โหลดหน้าจอครั้งแรก ให้อัปเดตเวลาตาม input เริ่มต้น
+        readInputs();
+        updateDisplay();
+    </script>
+</body>
+</html>
