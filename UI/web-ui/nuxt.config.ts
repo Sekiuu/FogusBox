@@ -9,6 +9,9 @@ export default defineNuxtConfig({
       mqtt: {
         url: process.env.NUXT_PUBLIC_MQTT_URL ?? 'wss://mqtt-dashboard.com:8884/mqtt',
         clientId: process.env.NUXT_PUBLIC_MQTT_CLIENT_ID ?? 'fg-server'
+      },
+      mqtt_topics:{
+        piaring: process.env.NUXT_PUBLIC_MQTT_PAIRING_TOPIC?? "fogus-box/pairing"
       }
     }
   },

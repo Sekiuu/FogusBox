@@ -1,15 +1,9 @@
 <script setup lang="ts">
-const massages = ref<string[]>([])
-const lastMsg = ref<string>("");
-onMounted(() => {
-  const { subscribe } = useMQTT()
-  subscribe('fogus-box/pairing', (msg) => {
-    console.log('pairing:', msg)
-    massages.value.push(msg)
-    lastMsg.value = msg;
-  })
+const { lastMessage, pair, onReviceMassage } = usePairing()
+const massages = ref<string[]>([]);
+onReviceMassage((msg) => {
+  massages.value.push(msg);
 })
-
 </script>
 
 <template>
@@ -18,13 +12,13 @@ onMounted(() => {
     <template #footer>
       <h1> Pairing Massages </h1>
       <div class="flex flex-col space-y-5 w-fit">
-        <span v-for="(msg, i) in massages" :key="i" class=" bg-primary-200/50 text-secondary-800 rounded-xs p-1">
+        <span v-if="massages.length > 0" v-for="msg,i in massages" :key="i" class=" bg-primary-200/50 text-secondary-800 rounded-xs p-1">
           {{ msg }}
         </span>
       </div>
     </template>
     <template #default>
-      <PairingForm :mqtt-massage="lastMsg" />
+      <PairingForm :mqtt-massage="lastMessage" :on-pair="pair" />
     </template>
   </UCard>
 </template>

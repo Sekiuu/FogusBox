@@ -5,11 +5,17 @@ export const useMQTT = () => {
 
   const subscribe = (topic: string, callback: (msg: string) => void) => {
     client.subscribe(topic)
-    client.on('message', (t: string, message: Buffer) => {
-      if (t === topic) {
+    const handler = (_t: string, message: Buffer) => {
+      if (_t === topic) {
         callback(message.toString())
       }
-    })
+    }
+    client.on('message', handler)
+    // Return an unsubscribe function so callers can clean up if needed.
+    return () => {
+      client.unsubscribe(topic)
+      client.off('message', handler)
+    }
   }
 
   return { subscribe }
