@@ -7,6 +7,12 @@ const massages = ref<{ topic: string, msg: string, time: string }[]>([]);
 const status_topic = ref("");
 const setting_topic = ref("");
 
+//auto paring form saved deviceID
+onMounted(() => {
+  if (deviceId)
+    connectToDevice(deviceId.value);
+})
+
 //----- paring fuctions -----
 onReviceMassage((msg) => {
   //on recive massage form pairing topics
@@ -15,28 +21,31 @@ onReviceMassage((msg) => {
 })
 
 //use this fuction for pair (can add to form or button)
-const pairDevice = (code: string) => {
+const pairWithCode = (code: string) => {
   const paired = pair(code);
   if (paired) {
-    const mqtt = useMQTT();
     //success
-    const config = useRuntimeConfig();
-    status_topic.value = config.public.mqtt_topics.status.replace("*", deviceId.value);
-    setting_topic.value = config.public.mqtt_topics.setting.replace("*", deviceId.value)
-    //send ack to deviceId/status
-    sendConnectAck(status_topic.value);
-    //subsbibe deviceId/status
-    mqtt.subscribe(status_topic.value, (msg, topic) => {
-      const time = new Date().toTimeString()
-      massages.value.push({ topic, msg, time });
-    })
-    //subsbibe deviceId/status
-    mqtt.subscribe(setting_topic.value, (msg, topic) => {
-      const time = new Date().toTimeString()
-      massages.value.push({ topic, msg, time });
-    })
+    connectToDevice(deviceId.value)
   }
   return paired
+}
+const connectToDevice = (deviceId: string) => {
+  const mqtt = useMQTT();
+  const config = useRuntimeConfig();
+  status_topic.value = config.public.mqtt_topics.status.replace("*", deviceId);
+  setting_topic.value = config.public.mqtt_topics.setting.replace("*", deviceId)
+  //send ack to deviceId/status
+  sendConnectAck(status_topic.value);
+  //subsbibe deviceId/status
+  mqtt.subscribe(status_topic.value, (msg, topic) => {
+    const time = new Date().toTimeString()
+    massages.value.push({ topic, msg, time });
+  })
+  //subsbibe deviceId/status
+  mqtt.subscribe(setting_topic.value, (msg, topic) => {
+    const time = new Date().toTimeString()
+    massages.value.push({ topic, msg, time });
+  })
 }
 //send acknowledge affter connected
 const sendConnectAck = (topic: string) => {
@@ -53,7 +62,7 @@ const sendConnectAck = (topic: string) => {
     <!-- settings -->
     <template #default>
       <div class="flex flex-col w-full justify-center items-center gap-4">
-        <PairingForm :mqtt-massage="lastMessage" :on-pair="pairDevice" />
+        <PairingForm :mqtt-massage="lastMessage" :on-pair="pairWithCode" />
         <TimeSettingForm v-if="deviceId" :setting_topic="setting_topic" />
       </div>
     </template>
