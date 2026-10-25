@@ -45,7 +45,9 @@ async function onSubmit(event: FormSubmitEvent<PairingSchema>) {
 </script>
 
 <template>
-  <UForm v-on:submit="onSubmit" :state="pairingCode" :schema="pairing_schema">
+  <UForm v-on:submit="onSubmit" :state="pairingCode" :schema="pairing_schema"
+    class=" space-y-4">
+    <h1>PAIRING</h1>
     <UFormField label="Code" name="code">
       <UInput v-model="pairingCode.code" />
     </UFormField>

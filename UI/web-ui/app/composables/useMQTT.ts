@@ -3,11 +3,11 @@ import { getMQTTClient } from '~/utils/mqtt'
 export const useMQTT = () => {
   const client = getMQTTClient()
 
-  const subscribe = (topic: string, callback: (msg: string) => void) => {
+  const subscribe = (topic: string, callback: (msg: string, topic: string) => void) => {
     client.subscribe(topic)
     const handler = (_t: string, message: Buffer) => {
       if (_t === topic) {
-        callback(message.toString())
+        callback(message.toString(), _t)
       }
     }
     client.on('message', handler)

@@ -38,15 +38,15 @@ export const usePairing = () => {
   const toast = useToast()
 
   // Subscribe once on mount so the page always receives pairing broadcasts.
-  let onMassage: (massage: string) => void;
-  const onReviceMassage = (handler: (massage: string) => void) => {
-    onMassage = handler;
+  let msgCallBack: (massage: string) => void;
+  const onReviceMassage = (callback: (massage: string) => void) => {
+    msgCallBack = callback;
   }
   onMounted(() => {
     const mqtt = useMQTT()
     mqtt.subscribe(pairingTopics, (msg) => {
       lastMessage.value = msg.toString()
-      onMassage(msg);
+      msgCallBack(msg);
     })
   })
 
@@ -94,5 +94,5 @@ export const usePairing = () => {
     }
   }
 
-  return { lastMessage, deviceId, pair, onReviceMassage }
+  return { lastMessage,pairingTopics, deviceId, pair, onReviceMassage }
 }
