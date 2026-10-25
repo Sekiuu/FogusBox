@@ -12,10 +12,11 @@ export const useMQTT = () => {
     }
     client.on('message', handler)
     // Return an unsubscribe function so callers can clean up if needed.
-    return () => {
+    function unsubscribe() {
       client.unsubscribe(topic)
       client.off('message', handler)
     }
+    return {unsubscribe}
   }
 
   const publish = (topic: string, message: string) => {

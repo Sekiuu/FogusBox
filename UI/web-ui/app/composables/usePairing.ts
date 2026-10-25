@@ -69,11 +69,6 @@ export const usePairing = () => {
       if (msg.code === code) {
         // Persist the paired device so the rest of the app can target it.
         deviceId.value = msg.device_id
-        toast.add({
-          title: 'Success',
-          color: 'primary',
-          description: `connected id is ${deviceId.value}`,
-        })
         return true
       }
 
