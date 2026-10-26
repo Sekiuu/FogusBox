@@ -45,7 +45,10 @@ const disconnect = () => {
           <span class="italic bg-info px-4 py-1 rounded-md text-xl">{{ connection.deviceId }}</span>
           <UButton color="error" @click="disconnect"> disconnected </UButton>
         </UBadge>
-        <TimeSettingForm v-if="connection.isConnected" :connection="connection" />
+        <div v-if="connection.isConnected" class="flex flex-col">
+          <MiniGameSettingFrom :connection="connection" />
+          <TimeSettingForm :connection="connection" />
+        </div>
       </div>
     </template>
 
