@@ -1,47 +1,154 @@
-Physical Computing Project 2026 - IT KMITL
+# Physical Computing Project 2026 - IT KMITL
 
----
-ระบบ **Dynamic Pairing Code** 
----
+## Project Title: FocusBox 📦
 
-### 1. โครงสร้าง Topic ทั้งหมด
-
-* **`{project_name}/pairing`** (Public Topic): ใช้สำหรับให้บอร์ดประกาศ Code และ Device ID ออกมาเป็นระยะตอนเปิดโหมด Pairing
-* **`{project_name}/{device_id}/status`** (Device $\rightarrow$ Web): ใช้ส่งสถานะ, Heartbeat และ ACK กลับไปที่หน้าเว็บ
-* **`{project_name}/{device_id}/settings`** (Web $\rightarrow$ Device): ใช้ส่งค่าตั้งค่าจากหน้าเว็บไปที่บอร์ด
+โปรเจกต์นี้เป็นส่วนหนึ่งในรายวิชา PHYSICAL COMPUTING 06016409 ภาคเรียนที่ 1 ปีการศึกษา 2569 คณะเทคโนโลยีสารสนเทศ สาขาเทคโนโลยีสารสนเทศ สถาบันเทคโนโลยีพระจอมเกล้าเจ้าคุณทหารลาดกระบัง
 
 ---
 
-### 2. ขั้นตอนการทำงาน (Step-by-Step)
+## บทคัดย่อ (Abstract)
 
-#### ขั้นตอนที่ 1: การ Pairing (จับคู่)
-
-1. **ฝั่ง Device:** เมื่อผู้ใช้เปิดโหมด Pairing บนกล่อง บอร์ดจะสุ่มรหัส 4 หลัก และส่ง Payload เข้าไปที่ `{project_name}/pairing` ทุกๆ 2-3 วินาที
-* *ตัวอย่าง Payload:* `{"device_id": "pbox_001", "code": "8492"}`
-
-
-2. **ฝั่ง Web-UI:** หน้าเว็บจะสั่ง `Subscribe` ไปที่ `{project_name}/pairing` รอไว้
-3. **การจับคู่:** ผู้ใช้ดูรหัส 4 หลักจากหน้าจอ OLED ของกล่อง แล้วมากรอกลงใน Web UI
-4. **บันทึก:** เมื่อหน้าเว็บเจอข้อความใน Topic ที่มี `code` ตรงกับที่ผู้ใช้พิมพ์ มันจะดึง `device_id` ออกมา, บันทึกลง `localStorage` ของเบราว์เซอร์ และทำการ `Unsubscribe` จาก topic pairing ทันที เพื่อความปลอดภัย
+โปรเจกต์นี้เป็นการพัฒนาอุปกรณ์ไมโครคอนโทรลเลอร์ **FocusBox** เพื่อช่วยบริหารเวลาและเพิ่มประสิทธิภาพการทำงานด้วยเทคนิค Pomodoro ในรูปแบบกล่องสี่เหลี่ยมพกพา โดยใช้บอร์ด Arduino UNO R4 WiFi ร่วมกับเซนเซอร์ GY-521 MPU6050 สำหรับตรวจจับการพลิกด้านของกล่องเพื่อเปลี่ยนโหมดจับเวลาโดยอัตโนมัติ นอกจากนี้ ในช่วงเวลาพักผ่อน หน้าจอแสดงผลจะเปลี่ยนเป็นมินิเกมที่ผู้ใช้สามารถควบคุมด้วยการเอียงกล่องเพื่อหลบสิ่งกีดขวาง ช่วยผ่อนคลายความตึงเครียดและเสริมสร้างวินัยในการทำงานได้อย่างมีประสิทธิภาพ
 
 ---
 
-#### ขั้นตอนที่ 2: การเช็คสถานะการเชื่อมต่อ (Status & Heartbeat)
+## Hardware
 
-1. **ฝั่ง Device:** ส่งข้อมูลสถานะไปยัง `{project_name}/{device_id}/status` เป็นระยะ (เช่น ทุกๆ 5-10 วินาที)
-* *ตัวอย่าง Payload:* `{"state": "idle", "battery": 85, "settings" : {...}}`
-
-
-2. **ฝั่ง Web-UI:** ทำการ `Subscribe` ไว้ที่ `{project_name}/{device_id}/status`
-3. **การเช็ค Online/Offline:** หน้าเว็บใช้ Timer (เช่น ถ้าผ่านไป 15 วินาทีแล้วยังไม่ได้รับข้อความใหม่เข้ามาเลย) จะแสดงสถานะบนหน้าจอว่า **"Disconnected / ออฟไลน์"** ทันที
+- Arduino UNO R4 WiFi
+- Buzzer
+- GY-521 MPU6050
+- Button
+- 0.96 Inch OLED I2C Display (128 × 64)
 
 ---
 
-#### ขั้นตอนที่ 3: การตั้งค่าและการตอบกลับ (Settings & ACK)
+## Libraries
 
-1. **ฝั่ง Web-UI:** เมื่อผู้ใช้เปลี่ยนค่าเวลาหรือเปลี่ยนมินิเกมบนเว็บ แล้วกดบันทึก ระบบจะส่ง JSON ไปที่ `{project_name}/{device_id}/settings`
-* *ตัวอย่าง Payload:* `{"work_time": 25, "break_time": 5, "minigame": "snake"}`
+- WiFiS3.h
+- PubSubClient.h
+- ArduinoJson.h
+- Wire.h
+
+---
+
+## Project Website
+
+[FocusBox Website](https://sekiuu.github.io/FocusBox/)
+
+---
+
+## Project Demo Video
+
+*Coming soon*
+
+---
+
+## Project Poster
+
+*Coming soon*
+
+---
+
+## Tools
+
+- Visual Studio Code
+
+---
+
+## Source Code
 
 
-2. **ฝั่ง Device:** บอร์ดซึ่ง `Subscribe` รออยู่ที่ topic settings อยู่แล้ว จะได้รับข้อความนี้นำไปบันทึกลง storage
-3. **การยืนยัน (ACK):** หลังจากบันทึกเสร็จ บอร์ดจะส่งสถานะอัปเดตกลับมาทาง `{project_name}/{device_id}/status` ทันที พร้อมแนบสถานะการตั้งค่า เพื่อให้หน้าเว็บรู้ว่าบอร์ดได้รับค่าและอัปเดตเรียบร้อยแล้ว
+#### 1. usePairing
+
+Device pairing is handled via MQTT. The user enters a 4-digit code displayed on the device. When the code matches, the device ID is saved in a cookie so the rest of the application can communicate with the paired device.
+
+**Data Flow**
+
+1. The device publishes a JSON payload to the `fogus-box/pairing` topic.
+
+   ```json
+   {
+     "code": "1234",
+     "device_id": "abc-123"
+   }
+   ```
+
+2. `usePairing` subscribes to the topic and stores the latest raw message.
+3. `PairingForm` collects a 4-digit code and calls `pair(code)`.
+4. If the code matches, `device_id` is saved in the `device_id` cookie.
+5. If pairing fails, the form is cleared and a warning toast is displayed.
+
+**Files**
+
+- `app/composables/usePairing.ts` — Handles the MQTT subscription, code matching, and cookie persistence.
+- `app/components/pairingForm.vue` — Form component that delegates pairing to a parent callback.
+- `app/pages/index.vue` — Connects the composable to the pairing form.
+
+#### 2. useDeviceConnection
+
+This composable manages the MQTT connection to a paired device, including the status and acknowledgment channel, settings channel, connection lifecycle, and request-response handling.
+
+**Interface**
+
+```typescript
+interface DeviceConnection {
+  deviceId: Ref<string | undefined>
+  statusTopic: Ref<string>
+  settingTopic: Ref<string>
+  statusMessage: Ref<MqttStatusMessage | null>
+  settingsMessage: Ref<string | null>
+  isConnected: Ref<boolean>
+  onRecivedStatus: (
+    callback: (msg: string, statusMsg: MqttStatusMessage) => void
+  ) => void
+  onRecivedSetting: (callback: (msg: string) => void) => void
+  waitForMassage: (
+    topic: string,
+    timeoutMs?: number
+  ) => Promise<string>
+  connect: () => Promise<void>
+  disconnect: () => void
+  publishSettings: (payload: unknown) => Promise<void>
+}
+```
+
+**Methods**
+
+- `connect()` — Publishes `"connected"` to `statusTopic`, subscribes to the status and settings topics, and waits for the device acknowledgment `{"status":"success"}`.
+- `disconnect()` — Publishes `"disconnect"`, unsubscribes from both topics, and clears the connection state.
+- `publishSettings(payload)` — Publishes a JSON payload to `settingTopic` and waits for the device acknowledgment.
+- `waitForMassage(topic, timeoutMs = 5000)` — Subscribes to a topic and resolves with the received message string, or rejects if the operation times out.
+- `onRecivedStatus(callback)` — Registers a listener for every message received on `statusTopic`.
+- `onRecivedSetting(callback)` — Registers a listener for every message received on `settingTopic`.
+
+**Device Contract**
+
+- After receiving `"connected"` on `statusTopic`, the device must publish `{"status":"success"}` back to `statusTopic`.
+- After receiving a settings payload on `settingTopic`, the device must publish `{"status":"success"}` back to `statusTopic`.
+
+**Files**
+
+- `app/composables/useDeviceConnection.ts` — Manages connection state, MQTT subscriptions, and acknowledgment logic.
+- `app/composables/useDeviceSettings.ts` — Validates, converts, and saves time settings through `publishSettings`.
+- `app/components/timeSettingForm.vue` — Form component connected to `useDeviceSettings.save()`.
+
+---
+
+## Contributors
+
+| Student ID | Name | Responsibility |
+|---|---|---|
+| 65070143 | นายภูริ งาดีสงวนนาม (ภูริ) | UI Development and Mini-game |
+| 65070149 | นายมุนินทร ดรลิเคน (เซก้า) | Web Application and System Connectivity |
+| 65070152 | นายยศกร ประหารภาพ (นิว) | Hardware Code and Firmware Development |
+| 65070166 | นางสาววธูพิตราพร เดชชัง (โฟร์) | Hardware and Device Structure |
+
+---
+
+## นำเสนอ
+
+**รศ.ดร. ปานวิทย์ ธุวะนุติ**
+
+อาจารย์ประจำคณะเทคโนโลยีสารสนเทศ สถาบันเทคโนโลยีพระจอมเกล้าเจ้าคุณทหารลาดกระบัง
+
+**Email:** panwit@it.kmitl.ac.th
