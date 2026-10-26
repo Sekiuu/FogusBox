@@ -6,16 +6,21 @@ const connection = useDeviceConnection(mqtt,pairing.deviceId)
 const messages = ref<{ topic: string; msg: string; time: string }[]>([])
 
 onMounted(async () => {
-  if (connection.deviceId.value && !connection.isConnected.value) {
+  if (connection.deviceId.value && !connection.isPaired.value) {
     await connection.connect()
   }
 })
-
 //msg reciving
 mqtt.client.on("message",(topic,payload) => {
   const time = new Date().toLocaleTimeString()
   const msg = payload.toString();
   messages.value.push({topic,msg,time})
+
+  //if found device on pairing -> discconnect
+  if(topic == pairing.pairingTopics && connection.isPaired.value){
+    const pharse = JSON.parse(msg) as {code:number,device_id:string}
+    if(pharse.device_id == pairing.deviceId.value) connection.disconnect()
+  }
 })
 
 const pairWithCode = async (code: string) => {
@@ -37,16 +42,15 @@ const disconnect = () => {
     <template #title> Fogus-box </template>
     <template #default>
       <div class="flex flex-col w-full justify-center items-center gap-4">
-        <PairingForm v-if="!connection.isConnected.value" :mqtt-massage="pairing.lastMessage.value"
+        <PairingForm v-if="!connection.isPaired.value" :mqtt-massage="pairing.lastMessage.value"
           :on-pair="pairWithCode" />
 
         <UBadge v-else class="flex flex-col" color="primary">
-          <p>Connected with</p>
+          <p>Paired with</p>
           <span class="italic bg-info px-4 py-1 rounded-md text-xl">{{ connection.deviceId }}</span>
-          <UButton color="error" @click="disconnect"> disconnected </UButton>
+          <UButton color="error" @click="disconnect"> unpair </UButton>
         </UBadge>
-        <div v-if="connection.isConnected" class="flex flex-col">
-          <MiniGameSettingFrom :connection="connection" />
+        <div v-if="connection.isPaired" class="flex flex-col">
           <TimeSettingForm :connection="connection" />
         </div>
       </div>
