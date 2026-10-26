@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="th" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusBox - Documentation</title>
+    
+    <!-- Google Fonts: Prompt for Thai typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+                    },
+                    colors: {
+                        primary: '#14b8a6', // Teal 500
+                        secondary: '#3b82f6', // Blue 500
+                        dark: {
+                            bg: '#0f172a',    // Slate 900
+                            card: '#1e293b',  // Slate 800
+                            border: '#334155' // Slate 700
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Prism.js CSS (Syntax Highlighter - Okaidia Dark Theme) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    
+    <style>
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        
+        /* Inline code style */
+        :not(pre) > code {
+            background-color: #334155;
+            color: #5eead4;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
+        }
+
+        /* Nav link active state */
+        .nav-link.active {
+            color: #14b8a6;
+            background-color: rgba(20, 184, 166, 0.1);
+            border-left: 3px solid #14b8a6;
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-slate-300 font-sans antialiased flex h-screen overflow-hidden">
+
+    <!-- Mobile Header -->
+    <header class="md:hidden fixed top-0 left-0 right-0 h-16 bg-dark-card border-b border-dark-border flex items-center justify-between px-4 z-50">
+        <div class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
+            FocusBox
+        </div>
+        <button id="mobile-menu-btn" class="text-slate-300 hover:text-white focus:outline-none">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+        </button>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-dark-card border-r border-dark-border transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-40 flex flex-col pt-16 md:pt-0">
+        <div class="p-6 hidden md:block">
+            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary tracking-wide">
+                FocusBox
+            </h1>
+            <p class="text-xs text-slate-400 mt-2">Physical Computing 2026<br>IT KMITL</p>
+        </div>
+        <nav class="flex-1 px-4 pb-4 space-y-2 overflow-y-auto">
+            <a href="#abstract" class="nav-link block px-4 py-2.5 rounded-r text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors">
+                บทคัดย่อ (Abstract)
+            </a>
+            <a href="#system-details" class="nav-link block px-4 py-2.5 rounded-r text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors">
+                รายละเอียดระบบ
+            </a>
+            <a href="#source-code" class="nav-link block px-4 py-2.5 rounded-r text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors">
+                Source Code
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content" class="flex-1 overflow-y-auto overflow-x-hidden pt-16 md:pt-0 scroll-smooth">
+        
+        <!-- Hero Section -->
+        <section class="py-16 px-6 md:px-12 lg:px-24 bg-gradient-to-b from-slate-800 to-dark-bg border-b border-dark-border">
+            <div class="max-w-4xl mx-auto text-center md:text-left">
+                <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-4">FocusBox</h1>
+                <p class="text-lg md:text-xl text-primary font-medium">Physical Computing Project 2026 - IT KMITL</p>
+                <p class="mt-4 text-slate-400 max-w-2xl">
+                    อุปกรณ์ไมโครคอนโทรลเลอร์ช่วยบริหารเวลาด้วยเทคนิค Pomodoro พร้อมมินิเกมผ่อนคลายความเครียด
+                </p>
+            </div>
+        </section>
+
+        <div class="max-w-4xl mx-auto px-6 md:px-12 lg:px-24 py-12 space-y-16">
+            
+            <!-- Abstract Section -->
+            <section id="abstract" class="scroll-mt-24">
+                <h2 class="text-2xl font-bold text-white mb-6 flex items-center">
+                    <span class="bg-primary/20 p-2 rounded-lg mr-3">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </span>
+                    บทคัดย่อ (Abstract)
+                </h2>
+                <div class="bg-dark-card border border-dark-border p-6 md:p-8 rounded-2xl shadow-xl leading-relaxed text-slate-300">
+                    <p class="indent-8">
+                        โปรเจกต์นี้เป็นการพัฒนาอุปกรณ์ไมโครคอนโทรลเลอร์ <strong>"FocusBox"</strong> เพื่อช่วยบริหารเวลาและเพิ่มประสิทธิภาพการทำงานด้วยเทคนิค Pomodoro ในรูปแบบกล่องสี่เหลี่ยมพกพา โดยใช้บอร์ด <strong>Arduino UNO R4 WiFi</strong> ร่วมกับเซนเซอร์ <strong>GY-521 MPU6050</strong> สำหรับตรวจจับการพลิกด้านของกล่องเพื่อเปลี่ยนโหมดจับเวลาโดยอัตโนมัติ
+                    </p>
+                    <p class="mt-4 indent-8">
+                        นอกจากนี้ ในช่วงเวลาพักผ่อน หน้าจอแสดงผลจะเปลี่ยนเป็นมินิเกมที่ผู้ใช้สามารถควบคุมด้วยการเอียงกล่องเพื่อหลบสิ่งกีดขวาง ช่วยผ่อนคลายความตึงเครียดและเสริมสร้างวินัยในการทำงานได้อย่างมีประสิทธิภาพ
+                    </p>
+                </div>
+            </section>
+
+            <!-- System Details Section -->
+            <section id="system-details" class="scroll-mt-24">
+                <h2 class="text-2xl font-bold text-white mb-6 flex items-center">
+                    <span class="bg-secondary/20 p-2 rounded-lg mr-3">
+                        <svg class="w-6 h-6 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </span>
+                    รายละเอียดระบบ: Dynamic Pairing Code
+                </h2>
+                
+                <div class="space-y-8">
+                    <!-- Section 1 -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-100 mb-4">1. โครงสร้าง Topic ทั้งหมด</h3>
+                        <ul class="space-y-3 bg-dark-card border border-dark-border p-5 rounded-xl">
+                            <li class="flex items-start">
+                                <span class="text-primary mr-2 mt-1">●</span>
+                                <div>
+                                    <code>{project_name}/pairing</code> <span class="text-slate-400 text-sm">(Public Topic)</span><br>
+                                    <span class="text-slate-300">ใช้สำหรับให้บอร์ดประกาศ Code และ Device ID ออกมาเป็นระยะตอนเปิดโหมด Pairing</span>
+                                </div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-primary mr-2 mt-1">●</span>
+                                <div>
+                                    <code>{project_name}/{device_id}/status</code> <span class="text-slate-400 text-sm">(Device → Web)</span><br>
+                                    <span class="text-slate-300">ใช้ส่งสถานะ, Heartbeat และ ACK กลับไปที่หน้าเว็บ</span>
+                                </div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-primary mr-2 mt-1">●</span>
+                                <div>
+                                    <code>{project_name}/{device_id}/settings</code> <span class="text-slate-400 text-sm">(Web → Device)</span><br>
+                                    <span class="text-slate-300">ใช้ส่งค่าตั้งค่าจากหน้าเว็บไปที่บอร์ด</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Section 2 -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-100 mb-4">2. ขั้นตอนการทำงาน (Step-by-Step)</h3>
+                        
+                        <div class="relative border-l border-dark-border ml-3 space-y-8 pb-4">
+                            
+                            <!-- Step 1 -->
+                            <div class="relative pl-6">
+                                <div class="absolute w-3 h-3 bg-primary rounded-full -left-1.5 top-1.5 ring-4 ring-dark-bg"></div>
+                                <h4 class="text-lg font-medium text-white">ขั้นตอนที่ 1: การ Pairing (จับคู่)</h4>
+                                <ul class="mt-2 text-slate-300 space-y-1 list-disc list-inside">
+                                    <li><strong>ฝั่ง Device:</strong> สุ่มรหัส 4 หลักส่งเข้า topic <code>pairing</code></li>
+                                    <li><strong>ฝั่ง Web-UI:</strong> รอรับและให้ผู้ใช้กรอกตัวเลข</li>
+                                    <li><strong>การบันทึก:</strong> หากรหัสตรงกัน จะบันทึก <code>device_id</code> ลง localStorage และทำการ Unsubscribe จาก topic ทันที</li>
+                                </ul>
+                            </div>
+
+                            <!-- Step 2 -->
+                            <div class="relative pl-6">
+                                <div class="absolute w-3 h-3 bg-secondary rounded-full -left-1.5 top-1.5 ring-4 ring-dark-bg"></div>
+                                <h4 class="text-lg font-medium text-white">ขั้นตอนที่ 2: การเช็คสถานะการเชื่อมต่อ (Status & Heartbeat)</h4>
+                                <ul class="mt-2 text-slate-300 space-y-1 list-disc list-inside">
+                                    <li><strong>ฝั่ง Device:</strong> ส่งข้อมูลสถานะเป็นระยะ (เช่น ทุก 5-10 วินาที)</li>
+                                    <li><strong>ฝั่ง Web-UI:</strong> ใช้ Timer จับเวลา 15 วินาที หากไม่มีข้อมูลเข้ามาใหม่ จะแสดงสถานะ <em>Online/Offline</em> ทันที</li>
+                                </ul>
+                            </div>
+
+                            <!-- Step 3 -->
+                            <div class="relative pl-6">
+                                <div class="absolute w-3 h-3 bg-teal-500 rounded-full -left-1.5 top-1.5 ring-4 ring-dark-bg"></div>
+                                <h4 class="text-lg font-medium text-white">ขั้นตอนที่ 3: การตั้งค่าและการตอบกลับ (Settings & ACK)</h4>
+                                <ul class="mt-2 text-slate-300 space-y-1 list-disc list-inside">
+                                    <li><strong>ฝั่ง Web-UI:</strong> ส่ง JSON ไฟล์ตั้งค่าไปที่ topic <code>settings</code></li>
+                                    <li><strong>ฝั่ง Device:</strong> รับค่าไปบันทึก และส่งสถานะยืนยัน (ACK) กลับมาทาง topic <code>status</code> เพื่ออัปเดตหน้าเว็บ</li>
+                                </ul>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Source Code Section -->
+            <section id="source-code" class="scroll-mt-24">
+                <h2 class="text-2xl font-bold text-white mb-6 flex items-center border-b border-dark-border pb-4">
+                    <span class="bg-purple-500/20 p-2 rounded-lg mr-3">
+                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    </span>
+                    Source Code (Composables)
+                </h2>
+
+                <!-- usePairing -->
+                <div class="mb-12">
+                    <h3 class="text-xl font-bold text-slate-100 mb-3 text-purple-400"># usePairing</h3>
+                    <p class="mb-4 text-slate-300">Device pairing is handled via MQTT. The user enters a 4-digit code shown on the device; on match the device id is saved to a cookie so the rest of the app can target that device.</p>
+                    
+                    <h4 class="font-semibold text-white mt-4 mb-2">Data Flow</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-slate-300 bg-dark-card p-4 rounded-xl border border-dark-border">
+                        <li>Device publishes a JSON payload to <code>fogus-box/pairing</code>: <br><span class="pl-5 text-sm"><code>{ "code": "1234", "device_id": "abc-123" }</code></span></li>
+                        <li><code>usePairing</code> subscribes to that topic and stores the latest raw message.</li>
+                        <li><code>PairingForm</code> collects a 4-digit code and calls <code>pair(code)</code>.</li>
+                        <li>On match, <code>device_id</code> is written to the <code>device_id</code> cookie.</li>
+                        <li>On failure, the form clears and shows a warning toast.</li>
+                    </ol>
+
+                    <h4 class="font-semibold text-white mt-6 mb-2">Files</h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-300">
+                        <li><code>app/composables/usePairing.ts</code> - composable owning MQTT subscription, matching, and cookie persistence.</li>
+                        <li><code>app/components/pairingForm.vue</code> - dumb form component; delegates pairing to a parent callback.</li>
+                        <li><code>app/pages/index.vue</code> - page that wires the composable to the form.</li>
+                    </ul>
+                </div>
+
+                <!-- useDeviceConnection -->
+                <div>
+                    <h3 class="text-xl font-bold text-slate-100 mb-3 text-purple-400"># useDeviceConnection</h3>
+                    <p class="mb-4 text-slate-300">Owns the MQTT connection to a paired device: status/ack channel, settings channel, connect/disconnect, and a request/response helper.</p>
+
+                    <h4 class="font-semibold text-white mt-4 mb-2">Interface</h4>
+                    <div class="rounded-xl overflow-hidden shadow-lg mb-6 text-sm">
+<pre><code class="language-typescript">interface DeviceConnection {
+  deviceId: Ref&lt;string | undefined&gt;
+  statusTopic: Ref&lt;string&gt;
+  settingTopic: Ref&lt;string&gt;
+  statusMessage: Ref&lt;MqttStatusMessage | null&gt;
+  settingsMessage: Ref&lt;string | null&gt;
+  isConnected: Ref&lt;boolean&gt;
+  onRecivedStatus: (callback: (msg: string, statusMsg: MqttStatusMessage) =&gt; void) =&gt; void
+  onRecivedSetting: (callback: (msg: string) =&gt; void) =&gt; void
+  waitForMassage: (topic: string, timeoutMs?: number) =&gt; Promise&lt;string&gt;
+  connect: () =&gt; Promise&lt;void&gt;
+  disconnect: () =&gt; void
+  publishSettings: (payload: unknown) =&gt; Promise&lt;void&gt;
+}</code></pre>
+                    </div>
+
+                    <h4 class="font-semibold text-white mt-6 mb-2">Methods</h4>
+                    <ul class="list-disc list-inside space-y-2 text-slate-300 bg-dark-card p-4 rounded-xl border border-dark-border">
+                        <li><code>connect()</code> - publishes <code>"connected"</code> to statusTopic, subscribes to status/setting topics, awaits device ack <code>{"status":"success"}</code>.</li>
+                        <li><code>disconnect()</code> - publishes <code>"disconnect"</code>, unsubscribes both topics, clears state.</li>
+                        <li><code>publishSettings(payload)</code> - publishes JSON payload to settingTopic, awaits device ack.</li>
+                        <li><code>waitForMassage(topic, timeoutMs=5000)</code> - subscribes to <code>topic</code>, resolves with the message string, or rejects on timeout.</li>
+                        <li><code>onRecivedStatus(callback)</code> - registers a listener for every statusTopic message.</li>
+                        <li><code>onRecivedSetting(callback)</code> - registers a listener for every settingTopic message.</li>
+                    </ul>
+
+                    <h4 class="font-semibold text-white mt-6 mb-2">Device Contract</h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-300">
+                        <li>After receiving <code>"connected"</code> on <code>statusTopic</code>, device must publish <code>{"status":"success"}</code> back to <code>statusTopic</code>.</li>
+                        <li>After receiving a settings payload on <code>settingTopic</code>, device must publish <code>{"status":"success"}</code> back to <code>statusTopic</code>.</li>
+                    </ul>
+
+                    <h4 class="font-semibold text-white mt-6 mb-2">Files</h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-300">
+                        <li><code>app/composables/useDeviceConnection.ts</code> - composable owning connection state, MQTT subscriptions, and ack logic.</li>
+                        <li><code>app/composables/useDeviceSettings.ts</code> - helper for validating/converting/saving time settings via <code>publishSettings</code>.</li>
+                        <li><code>app/components/timeSettingForm.vue</code> - form bound to <code>useDeviceSettings.save()</code>.</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <!-- Footer -->
+            <footer class="pt-8 pb-12 border-t border-dark-border text-center text-slate-500 text-sm">
+                <p>&copy; 2026 FocusBox. Physical Computing Project - IT KMITL.</p>
+                <p class="mt-1">Generated for GitHub Pages.</p>
+            </footer>
+
+        </div>
+    </main>
+
+    <!-- Prism.js Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+
+    <!-- UI Interactions Script -->
+    <script>
+        // Mobile Sidebar Toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('-translate-x-full');
+        });
+
+        // Close sidebar on link click (mobile)
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if(window.innerWidth < 768) {
+                    sidebar.classList.add('-translate-x-full');
+                }
+            });
+        });
+
+        // Scrollspy mechanism to highlight active nav links
+        const sections = document.querySelectorAll('section[id]');
+        const mainContent = document.getElementById('main-content');
+
+        const scrollActive = () => {
+            const scrollY = mainContent.scrollTop;
+            
+            sections.forEach(current => {
+                const sectionHeight = current.offsetHeight;
+                // Add top padding offset to calculation
+                const sectionTop = current.offsetTop - 150;
+                const sectionId = current.getAttribute('id');
+                const link = document.querySelector(`.nav-link[href*="${sectionId}"]`);
+                
+                if(link) {
+                    if(scrollY > sectionTop && scrollY <= sectionTop + sectionHeight){
+                        link.classList.add('active');
+                    } else {
+                        link.classList.remove('active');
+                    }
+                }
+            });
+        };
+
+        mainContent.addEventListener('scroll', scrollActive);
+        
+        // Trigger once on load
+        window.addEventListener('load', scrollActive);
+    </script>
+</body>
+</html>
