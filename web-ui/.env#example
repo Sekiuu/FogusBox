@@ -1,0 +1,21 @@
+# MQTT Broker
+# NOTE: the MQTT client runs in the browser, so every MQTT setting must be
+# exposed as a PUBLIC runtime config variable (NUXT_PUBLIC_*).
+
+# MQTT broker url
+# default: wss://mqtt-dashboard.com:8884/mqtt
+NUXT_PUBLIC_MQTT_URL=wss://mqtt-dashboard.com:8884/mqtt
+
+# MQTT client id
+# default: fg-server
+NUXT_PUBLIC_MQTT_CLIENT_ID=fg-server
+
+# MQTT topics
+# default: fogus-box/pairing
+NUXT_PUBLIC_MQTT_PAIRING_TOPIC=-box/pairing
+
+# default: fogus-box/*/status
+NUXT_PUBLIC_MQTT_STATUS_TOPIC=fogus-box/*/status
+
+# default: fogus-box/*/setting
+NUXT_PUBLIC_MQTT_SETTING_TOPIC=fogus-box/*/setting
