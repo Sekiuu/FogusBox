@@ -9,15 +9,22 @@ export const getMQTTClient = () => {
   if (!config.url) {
     throw new Error('MQTT broker URL is not defined in the runtime config (public.mqtt.url).')
   }
+  const uniqueClientId = config.clientId
+    ? `${config.clientId}-${Math.random().toString(36).slice(2, 8)}`
+    : `nuxt_${Math.random().toString(16).slice(2)}`
 
   client = mqtt.connect(config.url, {
-    clientId: config.clientId || 'nuxt_' + Math.random().toString(16).slice(2),
-    ...config
+    clientId: uniqueClientId,
+    keepalive: 60,
+    connectTimeout: 10_000,
+    reconnectPeriod: 5_000,
+    clean: true,
   })
 
-  client.on('connect', () => console.log('✅ MQTT connected'))
-  client.on('reconnect', () => console.log('🔄 MQTT reconnecting'))
+  client.on('connect', () => console.log('✅ MQTT connected', uniqueClientId))
+  client.on('reconnect', () => console.log('🔄 MQTT reconnecting', uniqueClientId))
   client.on('error', (err) => console.error('❌ MQTT error', err))
+  client.on('disconnect', (packet) => console.log('🔌 MQTT disconnected', packet))
 
   return client
 }

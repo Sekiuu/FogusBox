@@ -11,7 +11,7 @@ export default defineNuxtConfig({
         clientId: process.env.NUXT_PUBLIC_MQTT_CLIENT_ID ?? 'fg-server'
       },
       mqtt_topics:{
-        piaring: process.env.NUXT_PUBLIC_MQTT_PAIRING_TOPIC?? "fogus-box/pairing",
+        pairing: process.env.NUXT_PUBLIC_MQTT_PAIRING_TOPIC?? "fogus-box/pairing",
         status: process.env.NUXT_PUBLIC_MQTT_STATUS_TOPIC?? "fogus-box/*/status",
         setting: process.env.NUXT_PUBLIC_MQTT_SETTING_TOPIC?? "fogus-box/*/setting"
       }

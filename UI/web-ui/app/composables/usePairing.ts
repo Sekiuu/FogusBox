@@ -8,54 +8,28 @@
  *  - persists the matched `device_id` into the `device_id` cookie
  */
 
-import { useMQTT } from "#imports"
+import type { MqttPairingMessage, UseMQTT } from '~/types/mqtt'
 
-/**
- * Shape of an incoming MQTT pairing message.
- */
-export type MqttPairingMessage = {
-  /** 4-digit pairing code broadcast by the device */
-  code: string
-  /** Stable device identifier written to cookie on successful match */
-  device_id: string
-}
-
-export const usePairing = () => {
+export const usePairing = (mqtt:UseMQTT) => {
   const config = useRuntimeConfig()
-  const pairingTopics = config.public.mqtt_topics.piaring
+  const pairingTopics = config.public.mqtt_topics.pairing
 
-  /** Latest raw MQTT payload on the `fogus-box/pairing` topic */
   const lastMessage = ref<string>('')
 
-  /**
-   * Current paired device identifier.
-   *
-   * Backed by a cookie so it survives page reloads.
-   * Empty when the device is not yet paired.
-   */
   const deviceId = useCookie<string>('device_id')
 
   const toast = useToast()
 
-  // Subscribe once on mount so the page always receives pairing broadcasts.
-  let msgCallBack: (massage: string) => void;
-  const onReviceMassage = (callback: (massage: string) => void) => {
-    msgCallBack = callback;
-  }
-  onMounted(() => {
-    const mqtt = useMQTT()
-    mqtt.subscribe(pairingTopics, (msg) => {
-      lastMessage.value = msg.toString()
-      msgCallBack(msg);
+  const onReceiveMessage = (callback: (message: string) => void) => {
+    onMounted(() => {
+      mqtt.subscribe(pairingTopics, (msg) => {
+        lastMessage.value = msg.toString()
+        callback(lastMessage.value)
+      })
     })
-  })
+  }
 
-  /**
-   * Attempt to pair using the submitted code.
-   * @returns `true` if pairing succeeded and `device_id` was saved
-   */
   const pair = (code: string): boolean => {
-    // A pairing request must already be broadcasting before we can match it.
     if (lastMessage.value.length <= 0) {
       toast.add({
         title: "Can't Find Pairing Request",
@@ -67,7 +41,6 @@ export const usePairing = () => {
     try {
       const msg = JSON.parse(lastMessage.value) as MqttPairingMessage
       if (msg.code === code) {
-        // Persist the paired device so the rest of the app can target it.
         deviceId.value = msg.device_id
         return true
       }
@@ -89,5 +62,5 @@ export const usePairing = () => {
     }
   }
 
-  return { lastMessage,pairingTopics, deviceId, pair, onReviceMassage }
+  return { lastMessage, pairingTopics, deviceId, pair, onReceiveMessage }
 }

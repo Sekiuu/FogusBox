@@ -9,7 +9,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
  */
 const props = defineProps<{
   mqttMassage: string
-  onPair: (code: string) => boolean
+  onPair: (code: string) => any
 }>()
 
 /**
