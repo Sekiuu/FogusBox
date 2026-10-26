@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { MqttStatusMessage, UseMQTT } from '~/types/mqtt'
+import type { UseMQTT } from '~/types/mqtt'
 
 export interface DeviceConnection {
   deviceId: Ref<string | undefined>
@@ -7,7 +7,7 @@ export interface DeviceConnection {
   settingTopic: Ref<string>
   statusMessage: Ref<MqttStatusMessage | null>
   settingsMessage: Ref<string | null>
-  isPaired: Ref<boolean>,
+  isConnected: Ref<boolean>,
   onRecivedStatus: (callback: (msg: string, statusMsg: MqttStatusMessage) => void) => void,
   onRecivedSetting: (callback: (msg: string) => void) => void,
   connect: () => Promise<void>,
@@ -18,7 +18,6 @@ export interface DeviceConnection {
 export const useDeviceConnection = (mqtt: UseMQTT, deviceId: Ref<string | undefined>): DeviceConnection => {
   const config = useRuntimeConfig()
   const toast = useToast()
-  const CONNECTION_TIMEOUT = 5_000;
   const onRecivedStatus = (callback: (msg: string, statusMsg: MqttStatusMessage) => void) => {
     statusRecived = callback;
   }
@@ -36,18 +35,18 @@ export const useDeviceConnection = (mqtt: UseMQTT, deviceId: Ref<string | undefi
 
   let statusMessage = ref<MqttStatusMessage | null>(null)
   let settingsMessage = ref<string | null>(null)
-  const isPaired = ref(false)
+  const isConnected = ref(false)
 
   let statusUnsub: { unsubscribe: () => void } | null = null
   let settingUnsub: { unsubscribe: () => void } | null = null
 
   const handleStatusMessage = (msg: string, statusMsg: MqttStatusMessage) => {
     statusMessage.value = statusMsg
-    if (statusRecived) statusRecived(msg, statusMsg)
+    statusRecived(msg, statusMsg)
   }
 
   const connect = async () => {
-    if (isPaired.value || !deviceId.value) return
+    if (isConnected.value || !deviceId.value) return
 
     mqtt.publish(statusTopic.value, 'connected')
 
@@ -62,15 +61,14 @@ export const useDeviceConnection = (mqtt: UseMQTT, deviceId: Ref<string | undefi
 
     settingUnsub = mqtt.subscribe(settingTopic.value, (msg) => {
       settingsMessage.value = msg
-      if (settingRecived) settingRecived(msg)
+      settingRecived(msg)
     })
 
     try {
       //wait for device to ack
-      const msg = await mqtt.waitForMassage(statusTopic.value, CONNECTION_TIMEOUT)
-      const statusMsg = JSON.parse(msg) as MqttStatusMessage
-      if (statusMsg.status == "connected") {
-        isPaired.value = true
+      const msg = await mqtt.waitForMassage(statusTopic.value, 3000)
+      if (msg == "success") {
+        isConnected.value = true
         toast.add({
           title: 'Connected',
           color: 'primary',
@@ -96,7 +94,7 @@ export const useDeviceConnection = (mqtt: UseMQTT, deviceId: Ref<string | undefi
     settingUnsub = null
 
     deviceId.value = ''
-    isPaired.value = false
+    isConnected.value = false
     statusMessage.value = null
     settingsMessage.value = null
   }
@@ -105,7 +103,7 @@ export const useDeviceConnection = (mqtt: UseMQTT, deviceId: Ref<string | undefi
     mqtt.publish(settingTopic.value, JSON.stringify(payload))
 
     try {
-     const msg = await mqtt.waitForMassage(statusTopic.value, CONNECTION_TIMEOUT)
+     const msg = await mqtt.waitForMassage(statusTopic.value, 3000)
       if (msg == "success") {
         toast.add({
           title: 'Setting success!',
@@ -129,7 +127,7 @@ export const useDeviceConnection = (mqtt: UseMQTT, deviceId: Ref<string | undefi
     settingTopic,
     statusMessage,
     settingsMessage,
-    isPaired: isPaired,
+    isConnected,
     onRecivedStatus,
     onRecivedSetting,
     connect,

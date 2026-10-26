@@ -10,7 +10,7 @@
 
 import type { MqttPairingMessage, UseMQTT } from '~/types/mqtt'
 
-export const usePairing = (mqtt: UseMQTT) => {
+export const usePairing = (mqtt:UseMQTT) => {
   const config = useRuntimeConfig()
   const pairingTopics = config.public.mqtt_topics.pairing
 
@@ -20,15 +20,13 @@ export const usePairing = (mqtt: UseMQTT) => {
 
   const toast = useToast()
 
-  let handlePairingMessage: (message: string) => void = (msg) => {};
-  onMounted(() => {
-    mqtt.subscribe(pairingTopics, (msg) => {
-      lastMessage.value = msg.toString()
-      handlePairingMessage(lastMessage.value)
-    })
-  })
   const onReceiveMessage = (callback: (message: string) => void) => {
-    handlePairingMessage = callback;
+    onMounted(() => {
+      mqtt.subscribe(pairingTopics, (msg) => {
+        lastMessage.value = msg.toString()
+        callback(lastMessage.value)
+      })
+    })
   }
 
   const pair = (code: string): boolean => {

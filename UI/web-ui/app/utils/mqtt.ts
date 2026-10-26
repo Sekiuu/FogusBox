@@ -28,17 +28,3 @@ export const getMQTTClient = () => {
 
   return client
 }
-
-/**
- * Health check the MQTT connection.
- * The library's `connected` flag is only true after the broker PINGRESP, so
- * it is a reliable read of whether the connection is healthy.
- *
- * @param c - Optional client to check; defaults to the active client.
- * @returns true when connected and healthy.
- */
-export const healthCheck = (c?: mqtt.MqttClient): boolean => {
-  const clientInstance = c || client
-  if (!clientInstance || clientInstance.connecting || !clientInstance.connected) return false
-  return true
-}
