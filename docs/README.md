@@ -18,7 +18,7 @@
 - Buzzer
 - GY-521 MPU6050
 - Button
-- 0.96 Inch OLED I2C Display (128 × 64)
+- 16x2 UART Character LCD Display Module
 
 ---
 
