@@ -171,7 +171,7 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
       // wait for device to ack
       const msg = await mqtt.waitForMassage(statusTopic.value, CONNECTION_TIMEOUT)
       const statusMsg = JSON.parse(msg) as MqttStatusMessage
-      if (statusMsg.status === 'connected') {
+      if (statusMsg.status === 'connected' || statusMsg.state === 'connected' || statusMsg.status === 'success') {
         onConnected()
       }
     } catch (e) {
@@ -189,7 +189,15 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
 
     try {
       const msg = await mqtt.waitForMassage(statusTopic.value, SETTING_TIMEOUT)
-      if (msg == 'success') {
+      let isSuccess = false
+      try {
+        const parsed = JSON.parse(msg)
+        if (parsed.status === 'success' || parsed.state === 'success') isSuccess = true
+      } catch {
+        if (msg === 'success') isSuccess = true
+      }
+
+      if (isSuccess) {
         toast.add({
           title: 'Setting success!',
           color: 'primary',

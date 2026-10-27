@@ -405,8 +405,19 @@ void FogusBox::handleMqttMessage(char* topic, byte* payload, unsigned int length
   // 1. ข้อความใน Topic: {project_name}/{device_id}/status
   // --------------------------------------------------------------------------
   if (topicStr == _statusTopic) {
-    // ขั้นตอนที่ 1 (ข้อ 5-6): Web ส่ง "connected" เพื่อบอก device ว่าจับคู่สำเร็จแล้ว
-    if (message.equalsIgnoreCase("connected") || message.indexOf("\"status\":\"connected\"") >= 0 || message.indexOf("connected") >= 0) {
+    // 1. ป้องกันลูป: ถ้าเป็นข้อความ ACK ที่บอร์ดตัวเองส่งออกไป (มี "status": "success") ให้ข้ามทันที
+    StaticJsonDocument<384> statusDoc;
+    DeserializationError err = deserializeJson(statusDoc, payload, length);
+    if (!err && statusDoc.containsKey("status") && statusDoc["status"] == "success") {
+      return;
+    }
+
+    // 2. เช็คคำสั่ง connected แบบเจาะจง (ป้องกันการ match คำว่า connected ใน payload ที่บอร์ดส่งเอง)
+    bool isConnectCmd = message.equalsIgnoreCase("connected") ||
+                        (!err && statusDoc.containsKey("status") && statusDoc["status"] == "connected") ||
+                        (!err && statusDoc.containsKey("state") && statusDoc["state"] == "connected" && !statusDoc.containsKey("status"));
+
+    if (isConnectCmd) {
       _isPaired = true;
       _isPairingActive = false;
       _isPairingPaused = false;
@@ -419,7 +430,7 @@ void FogusBox::handleMqttMessage(char* topic, byte* payload, unsigned int length
     }
 
     // ขั้นตอนที่ 2 (ข้อ 3): หน้าเว็บตอบกลับ pong ใน status topic
-    if (message.equalsIgnoreCase("pong") || message.indexOf("pong") >= 0) {
+    if (message.equalsIgnoreCase("pong") || (!err && (statusDoc["state"] == "pong" || statusDoc["status"] == "pong"))) {
       _lastPongTime = millis(); // บันทึกเวลาที่ได้รับ pong ล่าสุด
       Serial.println(">>> [Heartbeat] ได้รับ pong จากหน้าเว็บเรียบร้อย <<<");
       return;
