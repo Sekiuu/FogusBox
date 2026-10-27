@@ -1,0 +1,36 @@
+#######################################
+# Syntax Highlighting for Minigame
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+Minigame	KEYWORD1
+GameState	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+begin	KEYWORD2
+update	KEYWORD2
+openMenu	KEYWORD2
+startGame	KEYWORD2
+startCaveEscape	KEYWORD2
+startStarCatcher	KEYWORD2
+stop	KEYWORD2
+getState	KEYWORD2
+isPlaying	KEYWORD2
+getScore	KEYWORD2
+getHighScore	KEYWORD2
+resetHighScore	KEYWORD2
+setEEPROMAddress	KEYWORD2
+setMenuTimeout	KEYWORD2
+setAutoReturnToMenu	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+GAME_STATE_IDLE	LITERAL1
+GAME_STATE_MENU	LITERAL1
+GAME_STATE_CAVE_ESCAPE	LITERAL1
+GAME_STATE_STAR_CATCHER	LITERAL1
