@@ -14,7 +14,7 @@ private:
 
 public:
   ProjectMqtt(const char *ssid, const char *pass, const char *server, int port, String projName, String devId)
-      : MyMqtt(ssid, pass, server, port, devId.c_str()),
+      : MyMqtt(ssid, pass, server, port, devId),
         projectName(projName), deviceId(devId), isPaired(false),
         lastPairingPublish(0), lastStatusPublish(0) {}
 

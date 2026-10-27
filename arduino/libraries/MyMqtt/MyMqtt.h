@@ -11,7 +11,7 @@ class MyMqtt {
     const char* password;
     const char* mqttServer;
     int mqttPort;
-    const char* clientId;
+    String clientId;
 
     WiFiClient wifiClient;
     PubSubClient mqttClient;
@@ -24,13 +24,14 @@ class MyMqtt {
     static void callbackWrapper(char* topic, byte* payload, unsigned int length);
 
   public:
-    MyMqtt(const char* ssid, const char* pass, const char* server, int port, const char* id);
+    MyMqtt(const char* ssid, const char* pass, const char* server, int port, String id);
 
     void begin();
     void loop();
     void connectWiFi();
     bool reconnectMQTT();
-    
+    bool connected();
+
     void publish(const char* topic, const char* message);
 
     void subscribe(const char* topic);

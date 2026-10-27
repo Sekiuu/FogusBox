@@ -1,13 +1,12 @@
 #include "ProjectMqtt.h"
 
 // กำหนดค่าโปรเจกต์
-const char* WIFI_SSID     = "ป๊อกโก้";
+const char* WIFI_SSID = "HY9P";
 const char* WIFI_PASSWORD = "1010101010";
-const char* MQTT_SERVER   = "broker.hivemq.com"; 
-const int   MQTT_PORT     = 1883;
+const char* MQTT_SERVER = "broker.hivemq.com";
+const int MQTT_PORT = 1883;
 
-// ตั้งชื่อโปรเจกต์และ Device ID ตามสเปก KMITL
-ProjectMqtt mqttClient(WIFI_SSID, WIFI_PASSWORD, MQTT_SERVER, MQTT_PORT, "it_kmitl_project", "pbox_001");
+ProjectMqtt mqttClient(WIFI_SSID, WIFI_PASSWORD, MQTT_SERVER, MQTT_PORT, "fogus-box", "pbox_001");
 
 unsigned long lastHeartbeat = 0;
 
@@ -16,9 +15,9 @@ void setup() {
   delay(1000);
 
   mqttClient.begin();
-  
+
   // จำลองว่ายังไม่จับคู่ตอนเปิดเครื่อง (สามารถเปลี่ยนเป็นอ่านค่าจาก EEPROM ได้)
-  mqttClient.setPaired(false); 
+  mqttClient.setPaired(false);
 }
 
 void loop() {
@@ -34,6 +33,6 @@ void loop() {
   unsigned long now = millis();
   if (now - lastHeartbeat > 10000) {
     lastHeartbeat = now;
-    mqttClient.sendStatus("idle", 90, 25, 5);
+    mqttClient.sendStatus("idle", 25, 5);
   }
 }
