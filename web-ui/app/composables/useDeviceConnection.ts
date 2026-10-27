@@ -20,7 +20,7 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
   const config = useRuntimeConfig()
   const toast = useToast()
   const CONNECTION_TIMEOUT = parseInt(config.public.connect_timeout);
-  const SETTING_TIMEOUT =  parseInt(config.public.setting_timeout);
+  const SETTING_TIMEOUT = parseInt(config.public.setting_timeout);
   const onRecivedStatus = (callback: (msg: string, statusMsg: MqttStatusMessage) => void) => {
     statusRecived = callback;
   }
@@ -64,6 +64,11 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
         try {
           const parsed = JSON.parse(msg) as MqttStatusMessage
           handleStatusMessage(msg, parsed)
+          //pingpong
+          if (parsed.status = "ping") {
+            const pongObject = { status: "pong" }
+            mqtt.publish(statusTopic.value, JSON.stringify(pongObject));
+          }
         } catch (e) {
           console.error(e)
         }
