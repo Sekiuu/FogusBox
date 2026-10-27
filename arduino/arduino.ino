@@ -39,6 +39,9 @@ void setup() {
   // เริ่มต้นระบบหลัก (โหลด Flash, MPU6050, Wi-Fi, MQTT, LCD, Buzzer)
   fogusBox.begin(WIFI_SSID, WIFI_PASSWORD, MQTT_SERVER, MQTT_PORT);
 
+  // ตั้งเวลา Cooldown หลังการพลิกกล่อง 2 วินาที (2000 ms) ป้องกันการเด้งสลับโหมดซ้ำ
+  fogusBox.setFlipDelay(2000);
+
   // เริ่มต้นระบบมินิเกม (false = ไม่แสดง Splash Screen ซ้ำตอนบูต)
   minigame.begin(false);
 }

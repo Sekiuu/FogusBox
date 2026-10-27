@@ -72,6 +72,14 @@ public:
   void saveSettings();
   void loadSettings();
 
+  // การตั้งค่าความหน่วงและ Cooldown ในการพลิกกล่อง
+  void setFlipDelay(unsigned long ms);
+  unsigned long getFlipDelay() const;
+  void setFlipCooldown(unsigned long ms);
+  unsigned long getFlipCooldown() const;
+  void setFlipDebounce(unsigned long ms);
+  unsigned long getFlipDebounce() const;
+
   // Network & MQTT
   bool connectNetwork();
   void sendPairingCode();
@@ -107,6 +115,8 @@ private:
   bool _isPairingActive;
   bool _isPairingPaused;
   unsigned long _lastPairingPublishTime;
+  unsigned long _lastPingTime;
+  unsigned long _lastPongTime;
 
   unsigned long _focusTimeMs;
   unsigned long _breakTimeMs;
@@ -123,7 +133,12 @@ private:
   const unsigned long _debounceDelay;
 
   bool _isFlippedUpper;
+  bool _pendingFlipped;
   unsigned long _lastFlipCheck;
+  unsigned long _flipDebounceStartTime;
+  unsigned long _lastFlipTriggerTime;
+  unsigned long _flipDebounceMs;
+  unsigned long _flipCooldownMs;
 
   void checkButton();
   void checkOrientation();

@@ -25,6 +25,8 @@ FogusBox::FogusBox(LiquidCrystal_I2C &lcd, uint8_t buzzerPin, uint8_t buttonPin)
     _isPairingActive(false),
     _isPairingPaused(false),
     _lastPairingPublishTime(0),
+    _lastPingTime(0),
+    _lastPongTime(0),
     _focusTimeMs(5000UL),
     _breakTimeMs(300000UL),
     _stateDurationMs(5000UL),
@@ -38,7 +40,12 @@ FogusBox::FogusBox(LiquidCrystal_I2C &lcd, uint8_t buzzerPin, uint8_t buttonPin)
     _lastDebounceTime(0),
     _debounceDelay(50),
     _isFlippedUpper(false),
-    _lastFlipCheck(0) {
+    _pendingFlipped(false),
+    _lastFlipCheck(0),
+    _flipDebounceStartTime(0),
+    _lastFlipTriggerTime(0),
+    _flipDebounceMs(350UL),
+    _flipCooldownMs(2000UL) {
   strcpy(_pairingCode, "0000");
 }
 
@@ -66,13 +73,18 @@ void FogusBox::begin(const char* ssid, const char* password, const char* mqttSer
     sensors_event_t a, g, temp;
     _mpu.getEvent(&a, &g, &temp);
     _isFlippedUpper = (a.acceleration.z < -4.0);
+    _pendingFlipped = _isFlippedUpper;
+    _flipDebounceStartTime = millis();
   }
 
-  // ตั้งค่า Device ID และ MQTT Topics
+  // กำหนด Topic ตามข้อกำหนดใน docs/dynamicpairingcode.md
+  // {project_name}/{device_id}/status และ {project_name}/{device_id}/settings
   _deviceId = getMacAddress();
   _statusTopic  = "fogus-box/" + _deviceId + "/status";
-  _settingTopic = "fogus-box/" + _deviceId + "/setting";
+  _settingTopic = "fogus-box/" + _deviceId + "/settings";
   Serial.println("Device ID: " + _deviceId);
+  Serial.println("Status Topic:  " + _statusTopic);
+  Serial.println("Setting Topic: " + _settingTopic);
 
   _mqttClient.setServer(_mqttServer, _mqttPort);
   _mqttClient.setCallback(globalMqttCallback);
@@ -94,7 +106,8 @@ void FogusBox::saveSettings() {
   _preferences.putULong("work", _focusTimeMs);
   _preferences.putULong("break", _breakTimeMs);
   _preferences.end();
-  Serial.println(">>> บันทึกค่าเวลาใหม่ลงใน Flash Memory เรียบร้อยแล้ว! <<<");
+  _stateDurationMs = _focusTimeMs;
+  Serial.println(">>> บันทึกค่าเวลาใหม่ลงใน Flash Memory เรียบร้อยแล้ว! (Work: " + String(_focusTimeMs / 1000UL) + "s, Break: " + String(_breakTimeMs / 1000UL) + "s) <<<");
 }
 
 void FogusBox::loadSettings() {
@@ -227,6 +240,19 @@ unsigned long FogusBox::getBreakTime() const { return _breakTimeMs; }
 void FogusBox::setWorkTime(unsigned long ms) { _focusTimeMs = ms; }
 void FogusBox::setBreakTime(unsigned long ms) { _breakTimeMs = ms; }
 
+void FogusBox::setFlipDelay(unsigned long ms) { _flipCooldownMs = ms; }
+unsigned long FogusBox::getFlipDelay() const { return _flipCooldownMs; }
+
+void FogusBox::setFlipCooldown(unsigned long ms) { _flipCooldownMs = ms; }
+unsigned long FogusBox::getFlipCooldown() const { return _flipCooldownMs; }
+
+void FogusBox::setFlipDebounce(unsigned long ms) { _flipDebounceMs = ms; }
+unsigned long FogusBox::getFlipDebounce() const { return _flipDebounceMs; }
+
+// ============================================================================
+// ขั้นตอนที่ 1: การ Pairing (จับคู่) ตาม docs/dynamicpairingcode.md
+// ส่ง Payload: {"device_id": "mac_address", "code": "8492"} เข้า {project_name}/pairing ทุก 30 วินาที
+// ============================================================================
 void FogusBox::sendPairingCode() {
   if (_isPairingPaused) return;
   int randomNum = random(0, 10000);
@@ -235,19 +261,23 @@ void FogusBox::sendPairingCode() {
   if (!connectNetwork()) return;
 
   StaticJsonDocument<256> doc;
-  doc["code"]      = _pairingCode;
   doc["device_id"] = _deviceId;
+  doc["code"]      = _pairingCode;
   char jsonBuffer[256];
   serializeJson(doc, jsonBuffer);
   _mqttClient.publish(_pairingTopic, jsonBuffer);
+  Serial.println(">>> ประกาศ Pairing: " + String(jsonBuffer) + " บน " + String(_pairingTopic) + " <<<");
 }
 
 void FogusBox::sendConnectedStatus() {
   StaticJsonDocument<384> doc;
-  doc["status"] = "connected";
+  doc["status"] = "success";
+  doc["state"]  = "connected";
   JsonObject settings = doc.createNestedObject("settings");
-  settings["work"]  = _focusTimeMs / 1000UL;
-  settings["break"] = _breakTimeMs / 1000UL;
+  settings["work_time"]  = _focusTimeMs / 1000UL;
+  settings["break_time"] = _breakTimeMs / 1000UL;
+  settings["work"]       = _focusTimeMs / 1000UL;
+  settings["break"]      = _breakTimeMs / 1000UL;
   JsonObject runtime = doc.createNestedObject("runtime");
   runtime["time_remain"] = 0;
   char jsonBuffer[384];
@@ -255,19 +285,40 @@ void FogusBox::sendConnectedStatus() {
   _mqttClient.publish(_statusTopic.c_str(), jsonBuffer);
 }
 
+// ============================================================================
+// ขั้นตอนที่ 3: การยืนยัน (ACK) หลังการตั้งค่า ตาม docs/dynamicpairingcode.md
+// ส่งกลับไปที่ {project_name}/{device_id}/status
+// โครงสร้าง: {"status": "success", "setting": {"work_time": 25, "break_time": 5}}
+// ============================================================================
 void FogusBox::sendSettingSuccess() {
-  StaticJsonDocument<256> doc;
-  doc["status"] = "success";
+  StaticJsonDocument<384> doc;
+  doc["status"]  = "success";
+  doc["message"] = "ตั้งค่าเสร็จแล้ว";
+
   JsonObject setting = doc.createNestedObject("setting");
-  setting["work"]  = _focusTimeMs / 1000UL;
-  setting["break"] = _breakTimeMs / 1000UL;
-  char jsonBuffer[256];
+  setting["work_time"]  = _focusTimeMs / 1000UL;
+  setting["break_time"] = _breakTimeMs / 1000UL;
+  setting["work"]       = _focusTimeMs / 1000UL;
+  setting["break"]      = _breakTimeMs / 1000UL;
+
+  JsonObject settings = doc.createNestedObject("settings");
+  settings["work_time"]  = _focusTimeMs / 1000UL;
+  settings["break_time"] = _breakTimeMs / 1000UL;
+  settings["work"]       = _focusTimeMs / 1000UL;
+  settings["break"]      = _breakTimeMs / 1000UL;
+
+  char jsonBuffer[384];
   serializeJson(doc, jsonBuffer);
+
+  // ส่งกลับไปยัง {project_name}/{device_id}/status ตามข้อกำหนดใน docs/dynamicpairingcode.md
   _mqttClient.publish(_statusTopic.c_str(), jsonBuffer);
+
+  Serial.println(">>> [ACK] ตอบกลับว่าตั้งค่าเสร็จแล้ว ไปยัง " + _statusTopic + ": " + String(jsonBuffer) + " <<<");
 }
 
 void FogusBox::sendTimerStatus(unsigned long remainingSeconds) {
   StaticJsonDocument<384> doc;
+  doc["state"] = "ping";
   JsonObject config = doc.createNestedObject("config");
   config["work"]  = _focusTimeMs / 1000UL;
   config["break"] = _breakTimeMs / 1000UL;
@@ -290,8 +341,17 @@ void FogusBox::reconnectMqtt() {
       _lcd.setCursor(0, 1);
       _lcd.print("MQTT Connected!");
       delay(1000);
-      _mqttClient.subscribe(_settingTopic.c_str());
-      _mqttClient.subscribe(_statusTopic.c_str());
+
+      // Subscribe topics ตามข้อกำหนดใน docs/dynamicpairingcode.md
+      _mqttClient.subscribe(_settingTopic.c_str()); // fogus-box/{device_id}/settings
+      String settingSingular = "fogus-box/" + _deviceId + "/setting";
+      _mqttClient.subscribe(settingSingular.c_str()); // fogus-box/{device_id}/setting
+      _mqttClient.subscribe(_statusTopic.c_str());  // fogus-box/{device_id}/status
+
+      Serial.println("Subscribed to:");
+      Serial.println(" - " + _settingTopic);
+      Serial.println(" - " + settingSingular);
+      Serial.println(" - " + _statusTopic);
     } else {
       _lcd.setCursor(0, 1);
       _lcd.print("MQTT Error!");
@@ -331,57 +391,120 @@ bool FogusBox::connectNetwork() {
   return _mqttClient.connected();
 }
 
+// ============================================================================
+// จัดการข้อความ MQTT ขาเข้า (Callback)
+// ============================================================================
 void FogusBox::handleMqttMessage(char* topic, byte* payload, unsigned int length) {
+  String topicStr = String(topic);
   String message = "";
   for (unsigned int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
-  if (message.equalsIgnoreCase("connected")) {
-    _isPaired = true;
-    _isPairingActive = false;
-    _isPairingPaused = false;
-    beep(2);
-    sendConnectedStatus();
-    showStandby();
-    return;
+
+  // --------------------------------------------------------------------------
+  // 1. ข้อความใน Topic: {project_name}/{device_id}/status
+  // --------------------------------------------------------------------------
+  if (topicStr == _statusTopic) {
+    // ขั้นตอนที่ 1 (ข้อ 5-6): Web ส่ง "connected" เพื่อบอก device ว่าจับคู่สำเร็จแล้ว
+    if (message.equalsIgnoreCase("connected") || message.indexOf("\"status\":\"connected\"") >= 0 || message.indexOf("connected") >= 0) {
+      _isPaired = true;
+      _isPairingActive = false;
+      _isPairingPaused = false;
+      _lastPongTime = millis(); // เริ่มนับ Heartbeat
+      beep(2);
+      sendConnectedStatus();
+      showStandby();
+      Serial.println(">>> [Pairing] หน้าเว็บเชื่อมต่อสำเร็จแล้ว! (Status: Connected) <<<");
+      return;
+    }
+
+    // ขั้นตอนที่ 2 (ข้อ 3): หน้าเว็บตอบกลับ pong ใน status topic
+    if (message.equalsIgnoreCase("pong") || message.indexOf("pong") >= 0) {
+      _lastPongTime = millis(); // บันทึกเวลาที่ได้รับ pong ล่าสุด
+      Serial.println(">>> [Heartbeat] ได้รับ pong จากหน้าเว็บเรียบร้อย <<<");
+      return;
+    }
+
+    // ข้อความสั่ง Disconnected หรือ Unpair
+    if (message.equalsIgnoreCase("disconnected") || message.equalsIgnoreCase("unpair") || message.indexOf("disconnect") >= 0) {
+      _isPaired = false;
+      _isPairingActive = false;
+      _isPairingPaused = false;
+      _isStarted = false;
+      beep(1);
+      showStandby();
+      Serial.println(">>> ได้รับคำสั่ง Disconnected จาก Web <<<");
+      return;
+    }
   }
-  if (message.equalsIgnoreCase("disconnected") || message.equalsIgnoreCase("unpair")) {
-    _isPaired = false;
-    _isPairingActive = true;
-    _isPairingPaused = false;
-    _isStarted = false;
-    beep(1);
-    sendPairingCode();
-    _lastPairingPublishTime = millis();
-    return;
-  }
-  if (String(topic) == _settingTopic) {
-    StaticJsonDocument<256> doc;
+
+  // --------------------------------------------------------------------------
+  // 2. ข้อความใน Topic: {project_name}/{device_id}/settings (ขั้นตอนที่ 3)
+  // Web-UI ส่ง JSON เช่น {"work_time": 25, "break_time": 5}
+  // --------------------------------------------------------------------------
+  String settingSingular = "fogus-box/" + _deviceId + "/setting";
+  if (topicStr == _settingTopic || topicStr == settingSingular) {
+    Serial.println(">>> [Settings] ได้รับคำสั่งตั้งค่าจาก Web: " + message + " <<<");
+
+    StaticJsonDocument<384> doc;
     DeserializationError error = deserializeJson(doc, payload, length);
     if (!error) {
+      // ป้องกันการวนลูป หากข้อความเป็นข้อความ ACK ที่มี status: success
+      if (doc.containsKey("status") && doc["status"] == "success") {
+        return;
+      }
+
       bool updated = false;
-      if (doc.containsKey("work_time")) { _focusTimeMs = doc["work_time"].as<unsigned long>() * 1000UL; updated = true; }
-      else if (doc.containsKey("work")) { _focusTimeMs = doc["work"].as<unsigned long>() * 1000UL; updated = true; }
-      if (doc.containsKey("break_time")) { _breakTimeMs = doc["break_time"].as<unsigned long>() * 1000UL; updated = true; }
-      else if (doc.containsKey("break")) { _breakTimeMs = doc["break"].as<unsigned long>() * 1000UL; updated = true; }
+
+      // ดึงค่าจาก JSON (รองรับทั้งแบบ nested object และแบบ flat key)
+      JsonObject root = doc.containsKey("setting") ? doc["setting"].as<JsonObject>() :
+                        (doc.containsKey("settings") ? doc["settings"].as<JsonObject>() : doc.as<JsonObject>());
+
+      if (root.containsKey("work_time")) {
+        _focusTimeMs = root["work_time"].as<unsigned long>() * 1000UL;
+        updated = true;
+      } else if (root.containsKey("work")) {
+        _focusTimeMs = root["work"].as<unsigned long>() * 1000UL;
+        updated = true;
+      }
+
+      if (root.containsKey("break_time")) {
+        _breakTimeMs = root["break_time"].as<unsigned long>() * 1000UL;
+        updated = true;
+      } else if (root.containsKey("break")) {
+        _breakTimeMs = root["break"].as<unsigned long>() * 1000UL;
+        updated = true;
+      }
 
       if (updated) {
-        _lcd.clear();
-        _lcd.setCursor(0, 0);
-        _lcd.print("Applying Setting");
-        _lcd.setCursor(0, 1);
-        _lcd.print("Please wait...");
-        delay(1000);
-
+        // 1. บันทึกลง Storage (Flash Memory) ทันที
         saveSettings();
         _isPaired = true;
         _isPairingActive = false;
         _isStarted = false;
+        _lastPongTime = millis();
+
+        // 2. ส่ง ACK ตอบกลับทันทีว่า "ตั้งค่าเสร็จแล้ว" (status: success) ตามข้อกำหนด
+        sendSettingSuccess();
+
+        // 3. แสดงผลยืนยันบนหน้าจอ LCD และส่งเสียงแจ้งเตือน
+        _lcd.clear();
+        _lcd.setCursor(0, 0);
+        _lcd.print("SETTING SAVED!  ");
+        _lcd.setCursor(0, 1);
+        _lcd.print("W:");
+        _lcd.print(_focusTimeMs / 1000UL);
+        _lcd.print("s B:");
+        _lcd.print(_breakTimeMs / 1000UL);
+        _lcd.print("s   ");
 
         beep(2);
-        sendSettingSuccess();
+        delay(1500);
+
         showSettingUpdated();
       }
+    } else {
+      Serial.println(">>> เกิดข้อผิดพลาดในการ Deserialize JSON Settings <<<");
     }
   }
 }
@@ -408,22 +531,56 @@ void FogusBox::checkButton() {
 
 void FogusBox::checkOrientation() {
   if (_isPairingActive) return;
-  if (millis() - _lastFlipCheck < 200) return;
-  _lastFlipCheck = millis();
+
+  unsigned long currentMillis = millis();
+
+  // 1. ตรวจสอบ Cooldown: ถ้าเพิ่งพลิกไปไม่ถึง _flipCooldownMs (เช่น 2 วินาที) ให้ล็อกไว้ไม่ให้พลิกซ้ำ
+  if (currentMillis - _lastFlipTriggerTime < _flipCooldownMs) {
+    _lastFlipCheck = currentMillis;
+    return;
+  }
+
+  if (currentMillis - _lastFlipCheck < 50) return;
+  _lastFlipCheck = currentMillis;
 
   sensors_event_t a, g, temp;
   _mpu.getEvent(&a, &g, &temp);
 
-  bool currentFlipped = (a.acceleration.z < -4.0);
-  if (currentFlipped != _isFlippedUpper) {
-    _isFlippedUpper = currentFlipped;
-    _previousTimerMillis = millis();
+  // 2. ใช้ Hysteresis เพื่อตัดการแกว่งของเซนเซอร์ขณะกำลังหมุนกล่องในอากาศ
+  // คว่ำ: Z < -3.5 m/s²
+  // หงาย: Z > 3.5 m/s²
+  // ระหว่าง -3.5 ถึง 3.5 คือช่วงกำลังหมุนกล่อง (Deadband) จะคงทิศทางเดิมไว้
+  bool currentFlipped = _pendingFlipped;
+  if (a.acceleration.z < -3.5) {
+    currentFlipped = true;
+  } else if (a.acceleration.z > 3.5) {
+    currentFlipped = false;
+  }
+
+  // 3. หากทิศทางเปลี่ยนไป ให้เริ่มนับเวลา Debounce
+  if (currentFlipped != _pendingFlipped) {
+    _pendingFlipped = currentFlipped;
+    _flipDebounceStartTime = currentMillis;
+  }
+
+  // 4. ต้องนิ่งอยู่ในทิศทางใหม่ต่อเนื่องอย่างน้อย _flipDebounceMs (350 ms)
+  // และทิศทางนั้นต้องต่างจากทิศทางปัจจุบัน (_isFlippedUpper)
+  if ((currentMillis - _flipDebounceStartTime >= _flipDebounceMs) && (_pendingFlipped != _isFlippedUpper)) {
+    _isFlippedUpper = _pendingFlipped;
+    _lastFlipTriggerTime = currentMillis; // เริ่มล็อก Cooldown ป้องกันการเด้งซ้ำ
+    _previousTimerMillis = currentMillis;
+
+    Serial.println(">>> ตรวจพบการพลิกกล่องที่เสถียร (Cooldown " + String(_flipCooldownMs) + "ms) สลับโหมดเวลา <<<");
+
     if (!_isStarted) {
       _isStarted = true;
       startFocus();
     } else {
-      if (_currentState == BOX_STATE_FOCUS) startBreak();
-      else startFocus();
+      if (_currentState == BOX_STATE_FOCUS) {
+        startBreak();
+      } else {
+        startFocus();
+      }
     }
   }
 }
@@ -437,15 +594,58 @@ void FogusBox::update() {
   checkButton();
   checkOrientation();
 
-  // โหมด Pairing
+  // --------------------------------------------------------------------------
+  // ขั้นตอนที่ 1: โหมด Pairing (ส่งรหัส 4 หลักเข้า {project_name}/pairing ทุก 30 วิ)
+  // --------------------------------------------------------------------------
   if (_isPairingActive) {
     if (!_isPairingPaused && (currentMillis - _lastPairingPublishTime >= 30000UL)) {
       _lastPairingPublishTime = currentMillis;
       sendPairingCode();
     }
   }
+
+  // --------------------------------------------------------------------------
+  // ขั้นตอนที่ 2: การเช็คสถานะการเชื่อมต่อ (Status & Heartbeat) เมื่อเชื่อมต่อแล้ว
+  // 1. ส่ง {"state": "ping"} ไปที่ status topic ทุกๆ 5 วินาที
+  // 2. ถ้าไม่ได้รับ "pong" ตอบกลับนานเกิน 25 วินาที ให้ตัดการเชื่อมต่อ
+  // --------------------------------------------------------------------------
+  if (_isPaired) {
+    if (currentMillis - _lastPingTime >= 5000UL) {
+      _lastPingTime = currentMillis;
+
+      StaticJsonDocument<256> pingDoc;
+      pingDoc["state"] = "ping";
+
+      // หากอยู่ในช่วงจับเวลา แนบสถานะเวลาถอยหลังไปด้วย
+      if (_isStarted) {
+        unsigned long elapsedTime = currentMillis - _previousTimerMillis;
+        unsigned long remaining = (_stateDurationMs > elapsedTime) ? (_stateDurationMs - elapsedTime) / 1000UL : 0;
+        JsonObject runtime = pingDoc.createNestedObject("runtime");
+        runtime["status"] = (_currentState == BOX_STATE_FOCUS) ? "work" : "break";
+        runtime["remain_time"] = remaining;
+      }
+
+      char pingBuf[256];
+      serializeJson(pingDoc, pingBuf);
+      _mqttClient.publish(_statusTopic.c_str(), pingBuf);
+    }
+
+    // ตรวจสอบ Timeout ของ Pong (นานเกิน 25 วินาที)
+    if (_lastPongTime > 0 && (currentMillis - _lastPongTime > 25000UL)) {
+      Serial.println(">>> ไม่ได้รับ Pong จาก Web นานเกินกำหนด! ยกเลิกการเชื่อมต่อและกลับสู่สถานะก่อน Pairing <<<");
+      _isPaired = false;
+      _isStarted = false;
+      _isPairingActive = false;
+      _lastPongTime = 0;
+      beep(1);
+      showStandby();
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // โหมดจับเวลา Pomodoro
-  else if (_isStarted) {
+  // --------------------------------------------------------------------------
+  if (_isStarted) {
     unsigned long elapsedTime = currentMillis - _previousTimerMillis;
 
     // ตรวจสอบหมดเวลา
@@ -463,13 +663,6 @@ void FogusBox::update() {
       unsigned int minutes  = totalSeconds / 60;
       unsigned int seconds  = totalSeconds % 60;
       showTimer(minutes, seconds);
-    }
-
-    // ส่งข้อมูลสถานะ MQTT ทุกๆ 1 วินาที
-    if (_mqttClient.connected() && (currentMillis - _lastDataPublishTime >= 1000)) {
-      _lastDataPublishTime = currentMillis;
-      unsigned long remaining = (_stateDurationMs - elapsedTime) / 1000;
-      sendTimerStatus(remaining);
     }
   }
 
