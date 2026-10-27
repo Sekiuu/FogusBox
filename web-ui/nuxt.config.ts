@@ -14,7 +14,9 @@ export default defineNuxtConfig({
         pairing: process.env.NUXT_PUBLIC_MQTT_PAIRING_TOPIC?? "fogus-box/pairing",
         status: process.env.NUXT_PUBLIC_MQTT_STATUS_TOPIC?? "fogus-box/*/status",
         setting: process.env.NUXT_PUBLIC_MQTT_SETTING_TOPIC?? "fogus-box/*/setting"
-      }
+      },
+      connect_timeout : process.env.CONNECT_ACK_TIMEOUT?? '10000',
+      setting_timeout : process.env.SETTING_ACK_TIMEOUT?? '5000'
     }
   },
   vite: {

@@ -10,7 +10,8 @@
 
 import type { MqttPairingMessage, UseMQTT } from '~/types/mqtt'
 
-export const usePairing = (mqtt: UseMQTT) => {
+export const usePairing = () => {
+  const mqtt = useMQTT()
   const config = useRuntimeConfig()
   const pairingTopics = config.public.mqtt_topics.pairing
 

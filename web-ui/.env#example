@@ -19,3 +19,6 @@ NUXT_PUBLIC_MQTT_STATUS_TOPIC=fogus-box/*/status
 
 # default: fogus-box/*/setting
 NUXT_PUBLIC_MQTT_SETTING_TOPIC=fogus-box/*/setting
+
+SETTING_ACK_TIMEOUT = 10000
+CONNECT_ACK_TIMEOUT = 5000
