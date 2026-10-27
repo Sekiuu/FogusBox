@@ -15,14 +15,18 @@ export interface UseMQTT {
   client: MqttClient;
 }
 export interface MqttStatusMessage {
-  status: string
+  status?: string,
+  state?: string,
   settings?: {
     work: number,
     break: number
   }
   runtime?: {
-    time_remain: number
+    time_remain?: number
+    status?: string
+    remain_time?: number
   }
+  [key: string]: unknown
 }
 
 export interface DeviceTimeSetting {

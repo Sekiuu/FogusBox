@@ -98,7 +98,7 @@ Device pairing is handled via MQTT. The user enters a 4-digit code displayed on 
 
 #### 2. useDeviceConnection
 
-This composable manages the MQTT connection to a paired device, including the status and acknowledgment channel, settings channel, connection lifecycle, and request-response handling.
+This composable manages the MQTT connection to a paired device, including the status and acknowledgment channel, settings channel, heartbeat (ping/pong) monitoring with timeout disconnection, and request-response handling.
 
 **Interface**
 
@@ -109,38 +109,40 @@ interface DeviceConnection {
   settingTopic: Ref<string>
   statusMessage: Ref<MqttStatusMessage | null>
   settingsMessage: Ref<string | null>
-  isConnected: Ref<boolean>
+  isPaired: Ref<boolean>
+  lastPing: Ref<number>
   onRecivedStatus: (
     callback: (msg: string, statusMsg: MqttStatusMessage) => void
   ) => void
   onRecivedSetting: (callback: (msg: string) => void) => void
-  waitForMassage: (
-    topic: string,
-    timeoutMs?: number
-  ) => Promise<string>
   connect: () => Promise<void>
   disconnect: () => void
   publishSettings: (payload: unknown) => Promise<void>
 }
 ```
 
-**Methods**
+**Methods & State**
 
-- `connect()` — Publishes `"connected"` to `statusTopic`, subscribes to the status and settings topics, and waits for the device acknowledgment `{"status":"success"}`.
-- `disconnect()` — Publishes `"disconnect"`, unsubscribes from both topics, and clears the connection state.
-- `publishSettings(payload)` — Publishes a JSON payload to `settingTopic` and waits for the device acknowledgment.
-- `waitForMassage(topic, timeoutMs = 5000)` — Subscribes to a topic and resolves with the received message string, or rejects if the operation times out.
+- `connect()` — Publishes `"connected"` to `statusTopic`, subscribes to the status and settings topics, waits for the device acknowledgment `{"status":"connected"}`, and starts the ping timeout heartbeat monitor.
+- `disconnect()` — Cancels the ping timeout timer, publishes `"disconnect"`, unsubscribes from both topics, and clears the connection state.
+- `publishSettings(payload)` — Publishes a JSON payload to `settingTopic` and waits for the device acknowledgment (`{"status":"success"}` or `"success"`).
 - `onRecivedStatus(callback)` — Registers a listener for every message received on `statusTopic`.
 - `onRecivedSetting(callback)` — Registers a listener for every message received on `settingTopic`.
+- `lastPing` — Reactive timestamp of the most recent ping received from the device (ms).
 
-**Device Contract**
+**Heartbeat (Ping/Pong) & Device Contract**
 
-- After receiving `"connected"` on `statusTopic`, the device must publish `{"status":"success"}` back to `statusTopic`.
-- After receiving a settings payload on `settingTopic`, the device must publish `{"status":"success"}` back to `statusTopic`.
+- **Connect ACK:** After receiving `"connected"` on `statusTopic`, the device must publish `{"status":"connected"}` back to `statusTopic`.
+- **Heartbeat:**
+  - The device sends `ping` (`"ping"` or `{"state":"ping"}`) to `statusTopic` periodically (e.g. every 5–10s).
+  - The Web UI replies with `"pong"` on `statusTopic`, records `lastPing`, and resets the ping timeout timer.
+  - If no ping or device activity is received within `PING_TIMEOUT` (default: 15s), the Web UI automatically calls `disconnect()`.
+  - If the device does not receive `"pong"`, it cancels the connection and returns to pairing mode.
+- **Settings ACK:** After receiving a settings payload on `settingTopic`, the device must publish `{"status":"success"}` or `"success"` back to `statusTopic`.
 
 **Files**
 
-- `app/composables/useDeviceConnection.ts` — Manages connection state, MQTT subscriptions, and acknowledgment logic.
+- `app/composables/useDeviceConnection.ts` — Manages connection state, ping/pong heartbeat, timeout disconnection, and MQTT subscriptions.
 - `app/composables/useDeviceSettings.ts` — Validates, converts, and saves time settings through `publishSettings`.
 - `app/components/timeSettingForm.vue` — Form component connected to `useDeviceSettings.save()`.
 

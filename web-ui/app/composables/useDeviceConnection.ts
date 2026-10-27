@@ -7,28 +7,52 @@ export interface DeviceConnection {
   settingTopic: Ref<string>
   statusMessage: Ref<MqttStatusMessage | null>
   settingsMessage: Ref<string | null>
-  isPaired: Ref<boolean>,
-  onRecivedStatus: (callback: (msg: string, statusMsg: MqttStatusMessage) => void) => void,
-  onRecivedSetting: (callback: (msg: string) => void) => void,
-  connect: () => Promise<void>,
-  disconnect: () => void,
+  isPaired: Ref<boolean>
+  lastPing: Ref<number>
+  onRecivedStatus: (callback: (msg: string, statusMsg: MqttStatusMessage) => void) => void
+  onRecivedSetting: (callback: (msg: string) => void) => void
+  connect: () => Promise<void>
+  disconnect: () => void
   publishSettings: (payload: unknown) => Promise<void>
 }
 
 export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceConnection => {
-  const mqtt = useMQTT();
+  const mqtt = useMQTT()
   const config = useRuntimeConfig()
   const toast = useToast()
-  const CONNECTION_TIMEOUT = parseInt(config.public.connect_timeout);
-  const SETTING_TIMEOUT = parseInt(config.public.setting_timeout);
+  const lastPing = ref(0)
+  const CONNECTION_TIMEOUT = parseInt((config.public.connect_timeout as string) || '10000')
+  const SETTING_TIMEOUT = parseInt((config.public.setting_timeout as string) || '5000')
+  const PING_TIMEOUT = parseInt((config.public.ping_timeout as string) || '15000')
+
+  let pingTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearPingTimeout = () => {
+    if (pingTimeoutTimer) {
+      clearTimeout(pingTimeoutTimer)
+      pingTimeoutTimer = null
+    }
+  }
+
+  const resetPingTimeout = () => {
+    clearPingTimeout()
+    if (!isPaired.value) return
+
+    pingTimeoutTimer = setTimeout(() => {
+      console.warn(`[useDeviceConnection] Ping timeout (${PING_TIMEOUT}ms elapsed without ping). Calling disconnect().`)
+      disconnect()
+    }, PING_TIMEOUT)
+  }
+
   const onRecivedStatus = (callback: (msg: string, statusMsg: MqttStatusMessage) => void) => {
-    statusRecived = callback;
+    statusRecived = callback
   }
   const onRecivedSetting = (callback: (msg: string) => void) => {
-    settingRecived = callback;
+    settingRecived = callback
   }
-  let statusRecived: (msg: string, statusMsg: MqttStatusMessage) => void;
-  let settingRecived: (msg: string) => void;
+  let statusRecived: ((msg: string, statusMsg: MqttStatusMessage) => void) | undefined
+  let settingRecived: ((msg: string) => void) | undefined
+
   const statusTopic = computed(() =>
     config.public.mqtt_topics.status.replace('*', deviceId.value ?? ''),
   )
@@ -48,55 +72,36 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
     if (statusRecived) statusRecived(msg, statusMsg)
   }
 
-  const connect = async () => {
-    if (isPaired.value || !deviceId.value) return
+  const isPingMessage = (rawMsg: string, parsed: MqttStatusMessage | null): boolean => {
+    const trimmed = rawMsg.trim().toLowerCase()
+    if (trimmed === 'pong') return false
+    if (trimmed === 'ping') return true
 
-    mqtt.publish(statusTopic.value, 'connected')
-
-    const onConnected = () => {
-      isPaired.value = true
-      toast.add({
-        title: 'Connected',
-        color: 'primary',
-        description: `connected id is ${deviceId.value}`,
-      })
-      statusUnsub = mqtt.subscribe(statusTopic.value, (msg) => {
-        try {
-          const parsed = JSON.parse(msg) as MqttStatusMessage
-          handleStatusMessage(msg, parsed)
-          //pingpong
-          if (parsed.status = "ping") {
-            const pongObject = { status: "pong" }
-            mqtt.publish(statusTopic.value, JSON.stringify(pongObject));
-          }
-        } catch (e) {
-          console.error(e)
-        }
-      })
-
-      settingUnsub = mqtt.subscribe(settingTopic.value, (msg) => {
-        settingsMessage.value = msg
-        if (settingRecived) settingRecived(msg)
-      })
+    if (parsed) {
+      const state = typeof parsed.state === 'string' ? parsed.state.trim().toLowerCase() : ''
+      const status = typeof parsed.status === 'string' ? parsed.status.trim().toLowerCase() : ''
+      if (state === 'pong' || status === 'pong') return false
+      if (state === 'ping' || status === 'ping') return true
     }
-    try {
-      //wait for device to ack
-      const msg = await mqtt.waitForMassage(statusTopic.value, CONNECTION_TIMEOUT)
-      const statusMsg = JSON.parse(msg) as MqttStatusMessage
-      if (statusMsg.status == "connected") {
-        onConnected()
-      }
-    } catch (e) {
-      console.warn('connect ack not received:', e)
-      toast.add({
-        title: 'Can not connect',
-        color: 'warning',
-        description: `disconnected device id : ${deviceId.value}`,
-      })
-    }
+
+    return false
+  }
+
+  const isSelfEcho = (rawMsg: string): boolean => {
+    const trimmed = rawMsg.trim().toLowerCase()
+    return (
+      trimmed === 'pong' ||
+      trimmed === 'connected' ||
+      trimmed === 'disconnect' ||
+      trimmed === 'disconnected'
+    )
   }
 
   const disconnect = () => {
+    clearPingTimeout()
+
+    if (!isPaired.value && !deviceId.value) return
+
     toast.add({
       title: 'Disconnected',
       color: 'warning',
@@ -111,8 +116,72 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
 
     deviceId.value = ''
     isPaired.value = false
+    lastPing.value = 0
     statusMessage.value = null
     settingsMessage.value = null
+  }
+
+  const connect = async () => {
+    if (isPaired.value || !deviceId.value) return
+
+    mqtt.publish(statusTopic.value, 'connected')
+
+    const onConnected = () => {
+      isPaired.value = true
+      lastPing.value = Date.now()
+      resetPingTimeout()
+
+      toast.add({
+        title: 'Connected',
+        color: 'primary',
+        description: `connected id is ${deviceId.value}`,
+      })
+
+      statusUnsub = mqtt.subscribe(statusTopic.value, (msg) => {
+        let parsed: MqttStatusMessage | null = null
+        try {
+          parsed = JSON.parse(msg) as MqttStatusMessage
+        } catch {
+          // Plain string message (e.g. 'ping', 'pong', etc.)
+        }
+
+        // When device sends ping, reply with pong and reset timeout
+        if (isPingMessage(msg, parsed)) {
+          lastPing.value = Date.now()
+          mqtt.publish(statusTopic.value, 'pong')
+          resetPingTimeout()
+        } else if (!isSelfEcho(msg)) {
+          // Other active message from device also indicates device is connected
+          lastPing.value = Date.now()
+          resetPingTimeout()
+        }
+
+        if (parsed) {
+          handleStatusMessage(msg, parsed)
+        }
+      })
+
+      settingUnsub = mqtt.subscribe(settingTopic.value, (msg) => {
+        settingsMessage.value = msg
+        if (settingRecived) settingRecived(msg)
+      })
+    }
+
+    try {
+      // wait for device to ack
+      const msg = await mqtt.waitForMassage(statusTopic.value, CONNECTION_TIMEOUT)
+      const statusMsg = JSON.parse(msg) as MqttStatusMessage
+      if (statusMsg.status === 'connected') {
+        onConnected()
+      }
+    } catch (e) {
+      console.warn('connect ack not received:', e)
+      toast.add({
+        title: 'Can not connect',
+        color: 'warning',
+        description: `disconnected device id : ${deviceId.value}`,
+      })
+    }
   }
 
   const publishSettings = async (payload: unknown) => {
@@ -120,7 +189,7 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
 
     try {
       const msg = await mqtt.waitForMassage(statusTopic.value, SETTING_TIMEOUT)
-      if (msg == "success") {
+      if (msg == 'success') {
         toast.add({
           title: 'Setting success!',
           color: 'primary',
@@ -133,6 +202,7 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
   }
 
   onUnmounted(() => {
+    clearPingTimeout()
     statusUnsub?.unsubscribe()
     settingUnsub?.unsubscribe()
   })
@@ -143,7 +213,8 @@ export const useDeviceConnection = (deviceId: Ref<string | undefined>): DeviceCo
     settingTopic,
     statusMessage,
     settingsMessage,
-    isPaired: isPaired,
+    isPaired,
+    lastPing,
     onRecivedStatus,
     onRecivedSetting,
     connect,

@@ -1,75 +1,59 @@
-# Nuxt Minimal Starter
+# FogusBox Web UI
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Web dashboard and companion interface for the **FogusBox** Pomodoro timer device built with Nuxt 3 / Nuxt UI and MQTT.
 
-## Setup
+## Overview
 
-Make sure to install dependencies:
+- **Dynamic Device Pairing:** Pair with a FogusBox device using a 4-digit OTP code shown on the physical display over MQTT.
+- **Heartbeat & Connection Monitoring:** Listens for periodic `ping` messages from the device, responds with `pong`, and automatically disconnects if the device goes offline or fails to ping before timeout.
+- **Remote Configuration:** Configure Pomodoro work time and break time durations and sync them with the device.
+
+## Environment Variables
+
+Configure connection settings in `.env` or system environment variables:
 
 ```bash
-# npm
-npm install
+# MQTT Broker URL (WebSockets)
+NUXT_PUBLIC_MQTT_URL=wss://mqtt-dashboard.com:8884/mqtt
 
-# pnpm
-pnpm install
+# MQTT Client ID
+NUXT_PUBLIC_MQTT_CLIENT_ID=fg-server
 
-# yarn
-yarn install
+# MQTT Topics
+NUXT_PUBLIC_MQTT_PAIRING_TOPIC=fogus-box/pairing
+NUXT_PUBLIC_MQTT_STATUS_TOPIC=fogus-box/*/status
+NUXT_PUBLIC_MQTT_SETTING_TOPIC=fogus-box/*/setting
 
-# bun
-bun install
+# Timeouts (in milliseconds)
+SETTING_ACK_TIMEOUT=60000
+CONNECT_ACK_TIMEOUT=5000
+PING_TIMEOUT=15000
 ```
 
-## Development Server
+## Setup & Development
+
+Install dependencies:
+
+```bash
+npm install
+```
 
 Start the development server on `http://localhost:3000`:
 
 ```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
-
-Build the application for production:
+Build for production:
 
 ```bash
-# npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
 npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## Documentation
+
+- [Composables & MQTT Architecture](app/composables/README.md)
+  - `usePairing`: Handles code matching and device ID persistence.
+  - `useDeviceConnection`: Manages connection lifecycle, ping/pong heartbeat, timeout disconnection, and MQTT publish/subscribe.
+  - `useDeviceSettings`: Validates and sends timer settings to the device.

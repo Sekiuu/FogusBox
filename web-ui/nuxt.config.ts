@@ -16,7 +16,8 @@ export default defineNuxtConfig({
         setting: process.env.NUXT_PUBLIC_MQTT_SETTING_TOPIC?? "fogus-box/*/setting"
       },
       connect_timeout : process.env.CONNECT_ACK_TIMEOUT?? '10000',
-      setting_timeout : process.env.SETTING_ACK_TIMEOUT?? '5000'
+      setting_timeout : process.env.SETTING_ACK_TIMEOUT?? '5000',
+      ping_timeout : process.env.PING_TIMEOUT?? '15000'
     }
   },
   vite: {
