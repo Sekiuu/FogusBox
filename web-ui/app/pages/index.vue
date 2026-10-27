@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const mqtt = useMQTT()
-const pairing = usePairing(mqtt)
-const connection = useDeviceConnection(mqtt,pairing.deviceId)
+const pairing = usePairing()
+const connection = useDeviceConnection(pairing.deviceId)
 
 const messages = ref<{ topic: string; msg: string; time: string }[]>([])
 

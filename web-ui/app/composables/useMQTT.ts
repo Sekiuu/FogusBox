@@ -38,5 +38,5 @@ export const useMQTT = () => {
     })
   }
 
-  return { subscribe, publish,waitForMassage, client }
+  return { subscribe, publish, waitForMassage, client }
 }

@@ -33,8 +33,8 @@
 
 ## Project Website
 
-[FocusBox Website](https://sekiuu.github.io/FocusBox/)
-
+[[FocusBox Website](https://sekiuu.github.io/FocusBox/)
+](https://sekiuu.github.io/FogusBox/)
 ---
 
 ## Project Demo Video
@@ -45,7 +45,7 @@
 
 ## Project Poster
 
-*Coming soon*
+[Fogus Box.pdf](https://github.com/user-attachments/files/34006768/Fogus.Box.pdf)
 
 ---
 
