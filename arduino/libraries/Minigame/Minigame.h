@@ -64,6 +64,11 @@ public:
   GameState getState() const;
 
   /**
+   * @brief ตรวจสอบว่าระบบมินิเกมกำลังทำงานอยู่หรือไม่ (เมนูหรือกำลังเล่นเกม)
+   */
+  bool isActive() const;
+
+  /**
    * @brief ตรวจสอบว่ากำลังเล่นเกมอยู่หรือไม่ (ไม่ใช่ IDLE หรือ MENU)
    */
   bool isPlaying() const;

@@ -6,7 +6,7 @@
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // กำหนดขาปุ่มกด (Pin 2)
-const int btnPin = 2;
+const int btnPin = 3;
 
 // สร้างออบเจ็กต์ Minigame
 Minigame minigame(lcd, btnPin);

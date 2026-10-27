@@ -45,9 +45,10 @@ void Minigame::begin(bool showSplash) {
 
   if (showSplash) {
     showSplashScreen();
+    openMenu();
+  } else {
+    _gameState = GAME_STATE_IDLE;
   }
-
-  openMenu();
 }
 
 void Minigame::showSplashScreen() {
@@ -89,6 +90,10 @@ void Minigame::stop() {
 
 GameState Minigame::getState() const {
   return _gameState;
+}
+
+bool Minigame::isActive() const {
+  return (_gameState != GAME_STATE_IDLE);
 }
 
 bool Minigame::isPlaying() const {

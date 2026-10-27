@@ -1,0 +1,52 @@
+#######################################
+# Syntax Highlighting for FogusBox
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+FogusBox	KEYWORD1
+BoxState	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+begin	KEYWORD2
+update	KEYWORD2
+isStarted	KEYWORD2
+isPaired	KEYWORD2
+isPairingActive	KEYWORD2
+isBreak	KEYWORD2
+isFocus	KEYWORD2
+getState	KEYWORD2
+startFocus	KEYWORD2
+startBreak	KEYWORD2
+stopTimer	KEYWORD2
+startPairing	KEYWORD2
+stopPairing	KEYWORD2
+beep	KEYWORD2
+showStandby	KEYWORD2
+showFocus	KEYWORD2
+showBreak	KEYWORD2
+showTimer	KEYWORD2
+showPairing	KEYWORD2
+showSettingUpdated	KEYWORD2
+suppressTimerDisplay	KEYWORD2
+isTimerDisplaySuppressed	KEYWORD2
+getWorkTime	KEYWORD2
+getBreakTime	KEYWORD2
+setWorkTime	KEYWORD2
+setBreakTime	KEYWORD2
+saveSettings	KEYWORD2
+loadSettings	KEYWORD2
+connectNetwork	KEYWORD2
+sendPairingCode	KEYWORD2
+sendConnectedStatus	KEYWORD2
+sendSettingSuccess	KEYWORD2
+sendTimerStatus	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+BOX_STATE_FOCUS	LITERAL1
+BOX_STATE_BREAK	LITERAL1
