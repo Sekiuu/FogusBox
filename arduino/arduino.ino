@@ -54,8 +54,9 @@ Preferences preferences;
 Adafruit_MPU6050 mpu;
 
 // --- Button & buzzer ---
-const int BUTTON_PIN = 2;  
-const int BUZZER     = 8;  
+const int BUTTON_PIN   = 2;  // ปุ่มหลัก (Pairing/ตั้งค่า)
+const int GAME_BTN_PIN = 3;  // ปุ่มสำหรับเล่นเกมตอนพัก
+const int BUZZER       = 8;  
 
 // --- LCD (I2C 16x2) ---
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -106,7 +107,7 @@ const unsigned long PAIRING_PUBLISH_INTERVAL_MS = 30000UL;
 
 char currentCode[5] = "0000";  
 
-// สถานะปุ่มกด 
+// สถานะปุ่มกดหลัก
 int buttonState = HIGH;             
 int lastButtonState = HIGH;         
 unsigned long lastDebounceTime = 0;
@@ -120,7 +121,32 @@ unsigned long lastPairingPublishTime = 0;
 unsigned long lastDataPublishTime  = 0;    
 
 // ============================================================================
-//  5. PERSISTENCE (Flash memory)
+//  5. MINIGAME VARIABLES
+// ============================================================================
+bool isPlayingGame = false;
+int gameState = 0; // 0 = หน้าเมนู, 1 = เล่นเกม Cave, 2 = เล่นเกม Star
+int selectedGame = 1; 
+
+unsigned long menuTimer = 0;
+bool lastGameBtnState = HIGH;
+bool gameBtnClicked = false;
+
+// --- เกมที่ 1 (Cave Escape) ---
+int playerRow1 = 1, obstacleX = 15, obstacleRow = 1, score1 = 0;
+unsigned long lastTick1 = 0;
+int oldPlayerRow1 = 1, oldObstacleX = 15, oldObstacleRow = 1;
+
+// --- เกมที่ 2 (Star Catcher) ---
+int playerX2 = 7, itemX2 = 0, itemRow2 = 0, itemType2 = 0; 
+int score2 = 0, highScore2 = 0;
+unsigned long dropTimer2 = 0, moveTimer2 = 0;
+int oldPlayerX2 = 7, oldItemX2 = 0, oldItemRow2 = 0, oldScore2 = -1;
+
+void resetGame(int gameId);
+void saveHighScore();
+
+// ============================================================================
+//  6. PERSISTENCE (Flash memory)
 // ============================================================================
 void saveTimerSettings(unsigned long workMs, unsigned long breakMs) {
   preferences.begin("timer_cfg", false);
@@ -134,11 +160,18 @@ void loadTimerSettings() {
   preferences.begin("timer_cfg", true);
   FOCUS_TIME   = preferences.getULong("work", 5000UL);
   BREAK_TIME   = preferences.getULong("break", 300000UL);
+  highScore2   = preferences.getInt("highscore", 0); // โหลด Highscore เกม
+  preferences.end();
+}
+
+void saveHighScore() {
+  preferences.begin("timer_cfg", false);
+  preferences.putInt("highscore", highScore2);
   preferences.end();
 }
 
 // ============================================================================
-//  6. DEVICE ID & MQTT TOPICS
+//  7. DEVICE ID & MQTT TOPICS
 // ============================================================================
 String getDeviceID() {
   byte mac[6];
@@ -157,7 +190,7 @@ void initMQTTTopics() {
 }
 
 // ============================================================================
-//  7. BUZZER
+//  8. BUZZER & DISPLAY 
 // ============================================================================
 void notifySound(int count) {
   for (int i = 0; i < count; i++) {
@@ -168,9 +201,6 @@ void notifySound(int count) {
   }
 }
 
-// ============================================================================
-//  8. DISPLAY 
-// ============================================================================
 void updateLCDStandby() {
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -219,6 +249,7 @@ void updateLCDPairing() {
 //  9. TIMER STATE MACHINE
 // ============================================================================
 void startFocusState() {
+  isPlayingGame = false; // หมดเวลาพัก บังคับออกจากเกมทันที
   currentState = FOCUS;
   stateDuration = FOCUS_TIME;
   lcd.clear();
@@ -232,24 +263,19 @@ void startBreakState() {
   stateDuration = BREAK_TIME;
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("STATE: BREAK   ");
+  lcd.print("BREAK  D3=Game "); // แนะนำปุ่มเข้าเกม
   notifySound(3);
 }
 
 // ============================================================================
-//  10. PAIRING
+//  10. PAIRING & MQTT 
 // ============================================================================
 void sendPairingCode() {
   if (isPairingPaused) return;
-
   int randomNum = random(0, 10000);
   snprintf(currentCode, sizeof(currentCode), "%04d", randomNum);
   updateLCDPairing();
-
-  if (!connectIfNeeded()) {
-    Serial.println("Network Error");
-    return;
-  }
+  if (!connectIfNeeded()) return;
 
   StaticJsonDocument<256> doc;
   doc["code"]      = currentCode;
@@ -259,9 +285,6 @@ void sendPairingCode() {
   client.publish(mqtt_pub_pairing_topic, jsonBuffer);
 }
 
-// ============================================================================
-//  11. MQTT PAYLOAD PUBLISH HELPERS
-// ============================================================================
 void sendConnectedStatusPayload() {
   StaticJsonDocument<384> doc;
   doc["status"] = "connected";
@@ -299,15 +322,11 @@ void sendTimerPayload(unsigned long totalSeconds) {
   client.publish(mqtt_status_topic.c_str(), jsonBuffer);
 }
 
-// ============================================================================
-//  12. MQTT CALLBACK
-// ============================================================================
 void callback(char* topic, byte* payload, unsigned int length) {
   String message = "";
   for (unsigned int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
-
   if (message.equalsIgnoreCase("connected")) {
     isPaired = true;
     isPairingActive = false;
@@ -317,7 +336,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
     updateLCDStandby();
     return;
   }
-
   if (message.equalsIgnoreCase("disconnected") || message.equalsIgnoreCase("unpair")) {
     isPaired = false;
     isPairingActive = true;
@@ -328,11 +346,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
     lastPairingPublishTime = millis();
     return;
   }
-
   if (String(topic) == mqtt_setting_topic) {
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, payload, length);
-
     if (!error) {
       bool updated = false;
       if (doc.containsKey("work_time")) { FOCUS_TIME = doc["work_time"].as<unsigned long>() * 1000UL; updated = true; }
@@ -341,52 +357,37 @@ void callback(char* topic, byte* payload, unsigned int length) {
       else if (doc.containsKey("break")) { BREAK_TIME = doc["break"].as<unsigned long>() * 1000UL; updated = true; }
 
       if (updated) {
-        // ---- แสดงสถานะกำลังตั้งค่าบนหน้าจอ LCD ----
         lcd.clear();
         lcd.setCursor(0, 0);
         lcd.print("Applying Setting");
         lcd.setCursor(0, 1);
         lcd.print("Please wait...");
-        delay(1000); // หน่วงเวลา 1 วินาทีให้เห็นข้อความ
-        // -------------------------------------------
+        delay(1000); 
 
         saveTimerSettings(FOCUS_TIME, BREAK_TIME);
-        
-        // รับค่าเสร็จถือว่าระบบจับคู่อยู่ (เพื่อรักษาเน็ตไว้รับค่าต่อๆ ไป)
         isPaired = true; 
         isPairingActive = false;
-        
-        // เราตั้งใจให้มันไม่หยุดจับเวลาถ้าทำงานอยู่ หรือจะหยุดก็ได้ตามต้องการ
-        // โค้ดเดิมให้ isStarted = false; ผมคงไว้เพื่อให้มันกลับหน้าสแตนด์บายก่อน
         isStarted = false; 
 
         notifySound(2);
         sendSettingSuccessPayload();
-        
-        // แสดงข้อความบนจอ LCD ว่าได้รับ Setting ใหม่และพร้อมใช้งานแล้ว
         updateLCDReadyNewSetting();
       }
     }
   }
 }
 
-// ============================================================================
-//  13. WIFI & MQTT RECONNECT (ใส่ระบบโชว์จอ LCD)
-// ============================================================================
 void reconnect() {
   while (!client.connected()) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("MQTT Connecting");
-    
     String clientId = "UNO_R4_Timer_";
     clientId += String(random(0xffff), HEX);
-    
     if (client.connect(clientId.c_str())) {
       lcd.setCursor(0, 1);
       lcd.print("MQTT Connected!");
       delay(1000); 
-      
       client.subscribe(mqtt_setting_topic.c_str());
       client.subscribe(mqtt_status_topic.c_str());
     } else {
@@ -403,7 +404,6 @@ bool connectIfNeeded() {
     lcd.setCursor(0, 0);
     lcd.print("WIFI Connecting");
     lcd.setCursor(0, 1);
-    
     WiFi.begin(ssid, password);
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
@@ -411,7 +411,6 @@ bool connectIfNeeded() {
       delay(500);
       attempts++;
     }
-    
     if (WiFi.status() != WL_CONNECTED) {
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -419,22 +418,19 @@ bool connectIfNeeded() {
       delay(2000);
       return false;
     }
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("WIFI Connected!");
     delay(1000); 
   }
-  
   if (!client.connected()) {
     reconnect();
   }
-  
   return client.connected();
 }
 
 // ============================================================================
-//  14. MPU6050 SENSING 
+//  11. HARDWARE SENSING (MPU & BUTTONS)
 // ============================================================================
 void checkOrientation() {
   if (isPairingActive) return;
@@ -445,10 +441,8 @@ void checkOrientation() {
   mpu.getEvent(&a, &g, &temp);
 
   bool currentFlipped = (a.acceleration.z < -4.0);
-
   if (currentFlipped != isFlippedUpper) {
     isFlippedUpper = currentFlipped;
-
     if (!isStarted) {
       isStarted = true;
       previousMillis = millis();
@@ -461,26 +455,20 @@ void checkOrientation() {
   }
 }
 
-// ============================================================================
-//  15. BUTTON HANDLING 
-// ============================================================================
 void checkButton() {
   int reading = digitalRead(BUTTON_PIN);
-
   if (reading != lastButtonState) {
     lastDebounceTime = millis();
   }
-
   if ((millis() - lastDebounceTime) > debounceDelay) {
     if (reading != buttonState) {
       buttonState = reading; 
-
       if (buttonState == LOW) {
         if (!isPairingActive) {
           isPairingActive = true;
           isPairingPaused = false;
           isStarted = false; 
-
+          isPlayingGame = false; // ปิดเกมถ้าจะเข้า Pairing
           Serial.println("\n>>> เข้าสู่ Pairing Mode <<<");
           notifySound(1);
           sendPairingCode(); 
@@ -488,7 +476,6 @@ void checkButton() {
         } else {
           isPairingActive = false;
           isPairingPaused = false;
-          
           Serial.println("\n>>> ออกจาก Pairing Mode <<<");
           notifySound(1);
           updateLCDStandby();
@@ -500,7 +487,140 @@ void checkButton() {
 }
 
 // ============================================================================
-//  16. SETUP & LOOP
+//  12. MINIGAME LOGIC 
+// ============================================================================
+void runMenu() {
+  // รับค่าการกดปุ่มมาจาก loop หลัก
+  if (gameBtnClicked) {
+    selectedGame = (selectedGame == 1) ? 2 : 1; 
+    menuTimer = millis(); 
+    lcd.clear(); 
+  }
+
+  lcd.setCursor(0, 0);
+  lcd.print("Select Game:");
+  lcd.setCursor(0, 1);
+  if (selectedGame == 1) {
+    lcd.print("> 1.Cave Escape ");
+  } else {
+    lcd.print("> 2.Star Catcher");
+  }
+
+  // ปรับเวลาตรงนี้ได้ครับ ถ้า 3000 (3 วินาที) เร็วไป ให้แก้เป็น 5000 
+  if (millis() - menuTimer > 3000) {
+    gameState = selectedGame;
+    resetGame(gameState);
+  }
+}
+
+void resetGame(int gameId) {
+  lcd.clear();
+  if (gameId == 1) {
+    lcd.print("Starting Cave...");
+    playerRow1 = 1; obstacleX = 15; score1 = 0;
+    oldPlayerRow1 = 1; oldObstacleX = 15;
+  } else {
+    lcd.print("Star Catcher");
+    lcd.setCursor(0, 1);
+    lcd.print("High: "); lcd.print(highScore2);
+    delay(1500);
+    playerX2 = 7; score2 = 0; itemX2 = random(0, 13); itemRow2 = 0;
+    oldPlayerX2 = 7; oldItemX2 = itemX2; oldItemRow2 = 0; oldScore2 = -1;
+  }
+  delay(1000);
+  lcd.clear();
+}
+
+void runCaveEscape() {
+  if (digitalRead(GAME_BTN_PIN) == LOW) playerRow1 = 0; 
+  else playerRow1 = 1; 
+
+  if (millis() - lastTick1 > 300) {
+    lastTick1 = millis();
+    obstacleX--;
+
+    if (obstacleX < 0) {
+      lcd.setCursor(0, obstacleRow);
+      lcd.print(" "); 
+      obstacleX = 15;
+      obstacleRow = random(0, 2);
+      score1++;
+    }
+
+    if (obstacleX == 1 && playerRow1 == obstacleRow) {
+      lcd.clear();
+      lcd.setCursor(0, 0); lcd.print("GAME OVER");
+      lcd.setCursor(0, 1); lcd.print("Score: "); lcd.print(score1);
+      delay(2000); 
+      gameState = 0; menuTimer = millis(); lcd.clear();
+      return;
+    }
+
+    if (oldPlayerRow1 != playerRow1) { lcd.setCursor(1, oldPlayerRow1); lcd.print(" "); }
+    lcd.setCursor(1, playerRow1); lcd.print("P");
+
+    if (oldObstacleX != obstacleX || oldObstacleRow != obstacleRow) {
+      lcd.setCursor(oldObstacleX, oldObstacleRow); lcd.print(" ");
+    }
+    lcd.setCursor(obstacleX, obstacleRow); lcd.print("#");
+
+    oldPlayerRow1 = playerRow1; oldObstacleX = obstacleX; oldObstacleRow = obstacleRow;
+  }
+}
+
+void runStarCatcher() {
+  if (millis() - moveTimer2 > 150) {
+    moveTimer2 = millis();
+    if (digitalRead(GAME_BTN_PIN) == LOW) { if (playerX2 < 15) playerX2++; } 
+    else { if (playerX2 > 0) playerX2--; }
+  }
+
+  if (millis() - dropTimer2 > 400) {
+    dropTimer2 = millis();
+    itemRow2++;
+    
+    if (itemRow2 > 1) {
+      if (itemX2 == playerX2) { 
+        if (itemType2 == 0) { 
+          score2++;
+          if (score2 > highScore2) {
+            highScore2 = score2;
+            saveHighScore(); // บันทึก High score ลง Flash memory
+          }
+        } else { 
+          lcd.clear();
+          lcd.setCursor(0, 0); lcd.print("BOOM! GAME OVER");
+          lcd.setCursor(0, 1); lcd.print("Score: "); lcd.print(score2);
+          delay(2000);
+          gameState = 0; menuTimer = millis(); lcd.clear();
+          return;
+        }
+      }
+      lcd.setCursor(itemX2, 1); lcd.print(" ");
+      itemX2 = random(0, 13); itemType2 = (random(0, 4) == 0) ? 1 : 0; itemRow2 = 0;
+    }
+  }
+
+  if (oldItemX2 != itemX2 || oldItemRow2 != itemRow2) {
+    lcd.setCursor(oldItemX2, oldItemRow2); lcd.print(" ");
+  }
+  lcd.setCursor(itemX2, itemRow2); lcd.print(itemType2 == 0 ? "*" : "X");
+
+  if (oldPlayerX2 != playerX2) {
+    lcd.setCursor(oldPlayerX2, 1); lcd.print(" ");
+  }
+  lcd.setCursor(playerX2, 1); lcd.print("O");
+
+  if (oldScore2 != score2) {
+    lcd.setCursor(13, 0); if (score2 < 10) lcd.print("  "); 
+    lcd.setCursor(13, 0); lcd.print(score2);
+  }
+
+  oldItemX2 = itemX2; oldItemRow2 = itemRow2; oldPlayerX2 = playerX2; oldScore2 = score2;
+}
+
+// ============================================================================
+//  13. SETUP & LOOP
 // ============================================================================
 void setup() {
   Serial.begin(115200);
@@ -509,6 +629,7 @@ void setup() {
 
   pinMode(BUZZER, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(GAME_BTN_PIN, INPUT_PULLUP); // ตั้งค่าปุ่มเกม
 
   randomSeed(analogRead(A0));
   lcd.init();
@@ -531,35 +652,46 @@ void setup() {
 }
 
 void loop() {
-  // 1. ถ้าระบบจับคู่กับแอปแล้ว (isPaired) ให้คอยเช็คและรักษาการเชื่อมต่อเน็ตไว้ตลอดเวลา
-  // เพื่อรอรับคำสั่ง Setting ได้ตลอดแม้ไม่ได้อยู่ในโหมด Pairing
-  if (isPaired) {
-    if (!client.connected()) {
-      connectIfNeeded();
-    }
-  }
-
-  // 2. ถ้าเชื่อมต่อเน็ตอยู่ ให้ฟังก์ชัน MQTT ทำงานเพื่อรอรับข้อความ
-  if (client.connected()) {
-    client.loop();
-  }
+  if (isPaired && !client.connected()) connectIfNeeded();
+  if (client.connected()) client.loop();
 
   unsigned long currentMillis = millis();
 
   checkButton();       
   checkOrientation();  
 
-  // 3. โหมด Pairing: วนรอบส่งรหัส ทุกๆ 30 วินาที
+  // ตรวจจับปุ่มกด D3 (เช็คแค่จุดเดียว)
+  bool gameBtnState = digitalRead(GAME_BTN_PIN);
+  gameBtnClicked = (gameBtnState == LOW && lastGameBtnState == HIGH); // เช็คว่าเพิ่งกดปุ่มใช่ไหม
+  lastGameBtnState = gameBtnState; // อัปเดตสถานะทันที
+
+  // หากอยู่ในสถานะ Break เพื่อเริ่มเข้าเกมเมนู
+  if (isStarted && currentState == BREAK && !isPlayingGame) {
+    if (gameBtnClicked) {
+      isPlayingGame = true;
+      gameState = 0;
+      selectedGame = 1;
+      menuTimer = millis();
+      lcd.clear();
+      
+      gameBtnClicked = false; // เคลียร์สถานะปุ่มทิ้ง ป้องกันไม่ให้เมนูสลับเกมเองตอนเพิ่งกดเข้าเกม
+    }
+  }
+
+  // 3. โหมด Pairing
   if (isPairingActive) {
     if (!isPairingPaused && (currentMillis - lastPairingPublishTime >= PAIRING_PUBLISH_INTERVAL_MS)) {
       lastPairingPublishTime = currentMillis;
       sendPairingCode();
     }
   }
-  // 4. โหมดจับเวลา: นับถอยหลัง และส่งข้อมูลเวลาผ่าน MQTT ทุกๆ 1 วินาที (ถ้าเน็ตต่ออยู่)
+  // 4. โหมดจับเวลา 
   else if (isStarted) {
     unsigned long elapsedTime = currentMillis - previousMillis;
 
+    // ----- ตรวจสอบหมดเวลา -----
+    // หากหมดเวลาพัก ระบบจะกระโดดไป startFocusState() ทันที
+    // และในนั้นจะสั่ง isPlayingGame = false ให้อัตโนมัติ (ตัดเกมออก)
     if (elapsedTime >= stateDuration) {
       previousMillis = currentMillis;
       if (currentState == FOCUS) startBreakState();
@@ -567,16 +699,27 @@ void loop() {
       elapsedTime = 0;
     }
 
-    unsigned long remainingMillis = stateDuration - elapsedTime;
-    unsigned long totalSeconds    = remainingMillis / 1000;
-    unsigned int minutes  = totalSeconds / 60;
-    unsigned int seconds  = totalSeconds % 60;
+    // ----- แสดงผล Timer หรือ Minigame -----
+    if (isPlayingGame && currentState == BREAK) {
+      // เล่นเกมแทนการโชว์ Timer
+      if (gameState == 0) runMenu();
+      else if (gameState == 1) runCaveEscape();
+      else if (gameState == 2) runStarCatcher();
+    } else {
+      // โชว์เวลา Timer ตามปกติ
+      unsigned long remainingMillis = stateDuration - elapsedTime;
+      unsigned long totalSeconds    = remainingMillis / 1000;
+      unsigned int minutes  = totalSeconds / 60;
+      unsigned int seconds  = totalSeconds % 60;
 
-    updateLCDTimer(minutes, seconds);
+      updateLCDTimer(minutes, seconds);
+    }
 
+    // ----- ส่ง MQTT Data (เบื้องหลังทำงานต่อเสมอ) -----
     if (client.connected() && (currentMillis - lastDataPublishTime >= 1000)) {
       lastDataPublishTime = currentMillis;
-      sendTimerPayload(totalSeconds);
+      unsigned long remaining = (stateDuration - elapsedTime) / 1000;
+      sendTimerPayload(remaining);
     }
   }
 
