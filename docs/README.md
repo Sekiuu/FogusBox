@@ -28,6 +28,18 @@
 - PubSubClient.h
 - ArduinoJson.h
 - Wire.h
+- Adafruit_BusIO
+- Adafruit_GFX_Library
+- Adafruit_MPU6050
+- Adafruit_SSD1306
+- Adafruit_Unified_Sensor
+- ArduinoJson
+- Button
+- IntervalTimer
+- LiquidCrystal_I2C
+- Minigame
+- MyMqtt
+- PubSubClient
 
 ---
 
