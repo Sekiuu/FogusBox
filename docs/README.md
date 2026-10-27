@@ -50,8 +50,7 @@
 ---
 
 ## Project Demo Video
-
-*Coming soon*
+[FocusBox Demo](https://youtu.be/L6KkoaNwVs0)
 
 ---
 
