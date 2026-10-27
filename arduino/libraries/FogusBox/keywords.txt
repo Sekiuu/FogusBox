@@ -44,6 +44,8 @@ sendPairingCode	KEYWORD2
 sendConnectedStatus	KEYWORD2
 sendSettingSuccess	KEYWORD2
 sendTimerStatus	KEYWORD2
+setFlipDelay	KEYWORD2
+getFlipDelay	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
